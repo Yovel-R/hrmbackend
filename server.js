@@ -215,14 +215,15 @@ app.use('/api', require('./routes/send-documents'));
 // ============================
 // Test Route
 // ============================
-app.get('/ping', (req, res) => {
-  res.json({ alive: true });
+app.get('/', (req, res) => {
+  res.send('HRM Backend is running');
 });
+
 
 // ============================
 // Start Server
 // ============================
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
