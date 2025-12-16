@@ -267,27 +267,59 @@ router.get("/get/:internid", async (req, res) => {
 
 // changing approved to ongoing
 
-router.post("/update-status", async (req, res) => {
+// in intern.routes.js
+router.get("/pastout", async (req, res) => {
   try {
-    const { internId, status } = req.body;
+    const year = parseInt(req.query.year);
+    const month = parseInt(req.query.month); // 0 = all
 
-    if (!internId || !status)
-      return res.status(400).json({ message: "Missing fields" });
+    // 1️⃣ Fetch accepted resignations
+    const resignations = await Resignation.find({ status: "accepted" });
 
-    const updated = await Intern.findOneAndUpdate(
-      { internid: internId },
-      { status },
-      { new: true }
-    );
+    // 2️⃣ Filter by lastWorkingDay
+    const filtered = resignations.filter((r) => {
+      if (!r.lastWorkingDay) return false;
 
-    if (!updated)
-      return res.status(404).json({ message: "Intern not found" });
+      // "16 Dec 2025"
+      const date = new Date(r.lastWorkingDay);
+      if (isNaN(date)) return false;
 
-    return res.json({ message: "Status updated", data: updated });
+      if (year && date.getFullYear() !== year) return false;
+      if (month && month !== 0 && date.getMonth() + 1 !== month) return false;
+
+      return true;
+    });
+
+    // 3️⃣ Get intern details
+    const internIds = filtered.map((r) => r.internId);
+
+    const interns = await Intern.find({
+      internid: { $in: internIds },
+    });
+
+    // 4️⃣ Merge resignation + intern data
+    const result = filtered.map((r) => {
+      const intern = interns.find((i) => i.internid === r.internId);
+
+      return {
+        internId: r.internId,
+        fullName: intern?.fullName ?? r.internName,
+        department: intern?.department ?? "",
+        endDate: r.lastWorkingDay,
+        status: "drop",
+        exitType: r.exitType,
+        exitReason: r.exitReason,
+      };
+    });
+
+    res.status(200).json(result);
   } catch (err) {
-    console.log(err);
-    return res.status(500).json({ message: "Server error" });
+    console.error("Past-out error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
+
+
+
 
 module.exports = router;

@@ -160,24 +160,12 @@ router.get("/intern/:id", async (req, res) => {
 });
 // 📌 Get Today's Attendance (FIXED)
 router.get("/today/:internId", async (req, res) => {
-  try {
-    const { internId } = req.params;
-
-    const today = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
-
-    const record = await Attendance.findOne({
-      internId,
-      date: today,
-    });
-
-    return res.status(200).json({
-      success: true,
-      record: record || null,
-    });
-  } catch (err) {
-    console.error("Today attendance error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
+  const { internId } = req.params;
+  const today = new Date().toISOString().slice(0, 10); // UTC date
+  const record = await Attendance.findOne({ internId, date: today });
+  console.log("Today attendance record:", record);
+  res.json({ record });
 });
+
 
 module.exports = router;
