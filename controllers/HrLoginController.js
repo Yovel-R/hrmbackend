@@ -104,3 +104,23 @@ exports.getPolicyUrl = async (req, res) => {
     res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
+
+// Get HR Policy URL for Interns
+exports.getPolicyForInterns = async (req, res) => {
+  try {
+    const hrUser = await hrModel.findOne().select("hr_policy_url policy_updated_at");
+
+    if (!hrUser || !hrUser.hr_policy_url) {
+      return res.status(404).json({ success: false, msg: "No HR policy available" });
+    }
+
+    res.json({
+      success: true,
+      policy_url: hrUser.hr_policy_url.trim(), // trim newline
+      policy_updated_at: hrUser.policy_updated_at
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, msg: "Server error", error: err.message });
+  }
+};
+
