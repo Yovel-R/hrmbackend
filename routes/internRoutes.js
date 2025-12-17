@@ -1,9 +1,11 @@
 const express = require("express");
 const Intern = require("../models/Intern");
+const Resignation = require("../models/resignation.model.js");  
 const bcrypt = require("bcryptjs");
 const router = express.Router();
 const multer = require('multer');
 const upload = multer();
+
 
 
 router.post("/add", async (req, res) => {
