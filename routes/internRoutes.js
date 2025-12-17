@@ -203,7 +203,9 @@ router.put("/reject/:id", async (req, res) => {
 // id generator
 
 async function generateInternId() {
-  const year = new Date().getFullYear().toString(); // "2025"
+  const yearShort = new Date().getFullYear() % 100; // 25 as number
+  const year = yearShort.toString();                // "25" as string
+
 
   const lastIntern = await Intern.findOne({
     internid: { $regex: "^" + year }
