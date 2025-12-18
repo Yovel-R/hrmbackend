@@ -1,5 +1,6 @@
 const express = require("express");
 const Attendance = require("../models/attendancemodel");
+const ExcelJS = require("exceljs");
 
 const router = express.Router();
 
@@ -167,5 +168,59 @@ router.get("/today/:internId", async (req, res) => {
   res.json({ record });
 });
 
+// 📌 Export Attendance Excel
+router.get("/export/:internId", async (req, res) => {
+  try {
+    const { internId } = req.params;
 
+    const records = await Attendance.find({ internId }).sort({ date: 1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Attendance");
+
+    sheet.columns = [
+      { header: "Date", key: "date", width: 15 },
+      { header: "Punch In", key: "in", width: 20 },
+      { header: "Punch Out", key: "out", width: 20 },
+      { header: "Work Duration", key: "duration", width: 15 },
+      { header: "Status", key: "status", width: 12 },
+    ];
+
+    records.forEach((r) => {
+      let status = "Absent";
+      if (r.punchInTime && r.punchOutTime) {
+        const diff =
+          (r.punchOutTime - r.punchInTime) / (1000 * 60);
+        status = diff < 360 ? "Short" : "Present";
+      }
+
+      sheet.addRow({
+        date: r.date,
+        in: r.punchInTime
+          ? new Date(r.punchInTime).toLocaleTimeString()
+          : "--",
+        out: r.punchOutTime
+          ? new Date(r.punchOutTime).toLocaleTimeString()
+          : "--",
+        duration: r.duration ?? "--",
+        status,
+      });
+    });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=attendance_${internId}.xlsx`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Export failed" });
+  }
+});
 module.exports = router;
