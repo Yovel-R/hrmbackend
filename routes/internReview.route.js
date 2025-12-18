@@ -2,122 +2,238 @@ const express = require("express");
 const router = express.Router();
 const Review = require("../models/internReview.model");
 
-// Add validation
+/* ---------------- UTIL ---------------- */
+
+function scoreForGrade(grade, weight) {
+  switch (grade) {
+    case "A": return weight * 1;
+    case "B": return weight * 0.75;
+    case "C": return weight * 0.5;
+    case "D": return weight * 0.25;
+    default: return 0;
+  }
+}
+
+/* ---------------- SUBMIT SELF REVIEW ---------------- */
+// POST /api/reviews/submit-review
+
 router.post("/submit-review", async (req, res) => {
   try {
-    req.body.date = new Date().toISOString().split("T")[0];
-    const review = new Review(req.body);
-    await review.save();
-    res.json({ success: true, message: "Review saved", id: review._id });
-  } catch (err) {
-    res.status(500).json({ success: false, error: "Failed to save review" });
-  }
-});
+    const { internId, internName, team, goals } = req.body;
 
-// GET latest review for an intern (used by HR screen)
-// GET /api/reviews/:internId?month=2025-12
-router.get("/:internId", async (req, res) => {
-  try {
-    const internId = req.params.internId;
-    const { month } = req.query; // "yyyy-MM"
-    const query = { internId };
-
-    if (month) query.date = new RegExp(`^${month}`); // matches "2025-12-10"
-
-    const review = await Review.findOne(query).sort({ date: -1 }).lean();
-
-    if (!review) {
-      return res.status(404).json({ success: false, message: "Review not found" });
+    if (!internId || !internName || !team || !Array.isArray(goals)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid review payload"
+      });
     }
 
-    res.json(review);
-  } catch (err) {
-    res.status(500).json({ success: false, error: "Failed to fetch review" });
-  }
-});
+    const today = new Date();
+    const dateStr = today.toISOString().split("T")[0];
+    const monthStr = dateStr.slice(0, 7);
 
+    const existing = await Review.findOne({
+      internId,
+      date: { $regex: `^${monthStr}` }
+    });
 
-// PUT: HR updates grades for each goal on that review
-// PUT /api/reviews/:internId/grade?month=2025-12
-router.put("/:internId/grade", async (req, res) => {
-  try {
-    const internId = req.params.internId;
-    const { month } = req.query;
-    const { goals } = req.body; // [{ _id, grade }]
-
-    if (!Array.isArray(goals) || goals.length === 0) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Goals array with _id and grade is required" });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "Review already submitted for this month"
+      });
     }
 
-    const query = { internId };
-    if (month) query.date = new RegExp(`^${month}`);
-
-    const review = await Review.findOne(query);
-
-    if (!review) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Review not found" });
-    }
-
-    const gradeMap = new Map(
-      goals
-          .filter(g => g._id && typeof g.grade === "string")
-          .map(g => [String(g._id), g.grade])
-    );
-
-    review.goals.forEach(goal => {
-      const id = String(goal._id);
-      if (gradeMap.has(id)) {
-        goal.grade = gradeMap.get(id);
-      }
+    const review = new Review({
+      internId,
+      internName,
+      team,
+      goals,
+      date: dateStr,
+      isGraded: false,
+      summary: {
+        obtainedScore: 0,
+        totalWeight: 0,
+        percentage: 0
+      },
+      overallPercentage: 0
     });
 
     await review.save();
 
-    res.json({ success: true, message: "Grades updated", review });
+    return res.json({
+      success: true,
+      message: "Review submitted successfully",
+      data: review
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: "Failed to update grades" });
+    console.error("Submit Review Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to submit review"
+    });
   }
 });
 
-
-// GET current-month self review for an intern
+/* ---------------- GET CURRENT MONTH SELF REVIEW ---------------- */
 // GET /api/reviews/self/:internId
+
 router.get("/self/:internId", async (req, res) => {
   try {
-    const internId = req.params.internId;
+    const { internId } = req.params;
 
-    // current month in yyyy-MM
     const now = new Date();
     const monthStr = `${now.getFullYear()}-${String(
       now.getMonth() + 1
     ).padStart(2, "0")}`;
 
-    const query = {
+    const review = await Review.findOne({
       internId,
-      date: new RegExp(`^${monthStr}`), // matches "2025-12-10"
-    };
-
-    const review = await Review.findOne(query).sort({ date: -1 }).lean();
+      date: { $regex: `^${monthStr}` }
+    })
+      .sort({ date: -1 })
+      .lean();
 
     if (!review) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Review not found for this month" });
+      return res.status(404).json({
+        success: false,
+        message: "Review not found for this month"
+      });
     }
 
-    return res.json(review);
+    return res.json({
+      success: true,
+      data: review
+    });
   } catch (err) {
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to fetch self review" });
+    console.error("Fetch Self Review Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch self review"
+    });
   }
 });
 
+/* ---------------- GET REVIEW (HR VIEW) ---------------- */
+// GET /api/reviews/:internId?month=2025-12
+
+router.get("/:internId", async (req, res) => {
+  try {
+    const { internId } = req.params;
+    const { month } = req.query;
+
+    const query = { internId };
+    if (month) query.date = { $regex: `^${month}` };
+
+    const review = await Review.findOne(query)
+      .sort({ date: -1 })
+      .lean();
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: review
+    });
+  } catch (err) {
+    console.error("Fetch Review Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch review"
+    });
+  }
+});
+
+/* ---------------- GRADE REVIEW (HR) ---------------- */
+// PUT /api/reviews/:internId/grade?month=2025-12
+
+router.put("/:internId/grade", async (req, res) => {
+  try {
+    const { internId } = req.params;
+    const { month } = req.query;
+    const { goals } = req.body;
+
+    if (!month || !Array.isArray(goals)) {
+      return res.status(400).json({
+        message: "Month and goals are required"
+      });
+    }
+
+    const review = await Review.findOne({
+      internId,
+      date: { $regex: `^${month}` }
+    });
+
+    if (!review) {
+      return res.status(404).json({
+        message: "Review not found"
+      });
+    }
+
+    if (review.isGraded) {
+      return res.status(400).json({
+        message: "Review already graded"
+      });
+    }
+
+    const totalWeight = review.goals.reduce(
+      (sum, g) => sum + g.weight,
+      0
+    );
+
+    let obtainedScore = 0;
+
+    review.goals = review.goals.map(goal => {
+      const incoming = goals.find(
+        g => g._id === goal._id.toString()
+      );
+
+      if (!incoming || !incoming.grade) return goal;
+
+      const score = scoreForGrade(incoming.grade, goal.weight);
+      obtainedScore += score;
+
+      return {
+        ...goal.toObject(),
+        grade: incoming.grade,
+        score
+      };
+    });
+
+    const percentage =
+      totalWeight === 0 ? 0 : (obtainedScore / totalWeight) * 100;
+
+    const finalPercentage = Number(percentage.toFixed(2));
+
+    review.summary = {
+      obtainedScore,
+      totalWeight,
+      percentage: finalPercentage
+    };
+
+    review.overallPercentage = finalPercentage;
+    review.isGraded = true;
+
+    await review.save();
+
+    return res.json({
+      success: true,
+      message: "Review graded successfully",
+      data: review
+    });
+  } catch (err) {
+    console.error("Grade Review Error:", err);
+    return res.status(500).json({
+      message: "Server error"
+    });
+  }
+});
+
+/* ---------------- EXPORT ---------------- */
 
 module.exports = router;
-
-
