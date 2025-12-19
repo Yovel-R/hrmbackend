@@ -21,7 +21,8 @@ router.post("/add", async (req, res) => {
       emergencyContact,
       onboardingDate,
       endDate,
-      linkedin
+      linkedin,
+      internshipType
     } = req.body;
 
     const intern = new Intern({
@@ -36,7 +37,7 @@ router.post("/add", async (req, res) => {
       onboardingDate,
       endDate,
       linkedin,
-
+      internshipType,
       // backend-generated field
       status: "initial",
     });
@@ -124,61 +125,134 @@ router.get("/all/active", async (req, res) => {
 // });
 const sendEmail = require("../utilities/sendEmail");
 
-router.put("/accept/:id", upload.fields([{ name: 'pdf' }, { name: 'pdf_1' }, { name: 'pdf_2' }]), async (req, res) => {
-  try {
-  const { onboardingDate, endDate } = req.body;
-  const intern = await Intern.findById(req.params.id);
-  if (!intern) return res.status(404).json({ message: "Intern not found" });
+// router.put("/accept/:id", upload.fields([{ name: 'pdf' }, { name: 'pdf_1' }, { name: 'pdf_2' }]), async (req, res) => {
+//   try {
+//   const { onboardingDate, endDate, internshipType } = req.body;
+//   const intern = await Intern.findById(req.params.id);
+//   if (!intern) return res.status(404).json({ message: "Intern not found" });
 
-  // Correct multer file access
-  const pdfBuffer = req.files['pdf']?.[0]?.buffer;
-  const pdf1Buffer = req.files['pdf_1']?.[0]?.buffer;
-  const pdf2Buffer = req.files['pdf_2']?.[0]?.buffer;
 
-  if (!pdfBuffer || !pdf1Buffer) {
-    return res.status(400).json({ message: "PDF files missing" });
+//   if (internshipType && !["Stipend", "Paid"].includes(internshipType)) {
+//   return res.status(400).json({ message: "Invalid internship type" });
+// }
+
+
+//   // Correct multer file access
+//   const pdfBuffer = req.files['pdf']?.[0]?.buffer;
+//   const pdf1Buffer = req.files['pdf_1']?.[0]?.buffer;
+//   const pdf2Buffer = req.files['pdf_2']?.[0]?.buffer;
+
+//   if (!pdfBuffer || !pdf1Buffer) {
+//     return res.status(400).json({ message: "PDF files missing" });
+//   }
+
+//   const newId = await generateInternId();
+//   intern.internid = newId;
+//   intern.status = "approved";
+
+//   const formatDate = (dateString) => {
+//     if (!dateString) return "";
+//     const date = new Date(dateString);
+//     return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+//   };
+
+//   intern.onboardingDate = formatDate(onboardingDate);
+//   intern.endDate = formatDate(endDate);
+//   if (internshipType) {
+//         intern.internshipType = internshipType;
+//       }
+
+//   await intern.save();
+
+//   // Fix email attachments - use buffers directly
+//   await sendEmail({
+//     to: intern.email,
+//     subject: "Your Intern ID is Ready",
+//     html: `
+//       <h2>Hi ${intern.fullName},</h2>
+//       <p>Your profile has been <b>approved</b> 🎉</p>
+//       <p>Your new <b>Intern ID</b> is: <b>${newId}</b></p>
+//       <p>Onboarding Date: <b>${intern.onboardingDate}</b></p>
+//       <p>End Date: <b>${intern.endDate}</b></p>
+//       <p>Please save this ID — you'll use it for login.</p>
+//       <br><p>Regards,<br>HR Team</p>
+//     `,
+//     attachments: [
+//       { filename: `${newId} -Softrate Internship Offer Letter.pdf`, content: pdfBuffer },
+//       { filename: `${newId} -Softrate Internship Annexure.pdf`, content: pdf1Buffer },
+//       { filename: `${newId} - Softrate Internship NDA.pdf`, content: pdf2Buffer }
+//     ]
+//   });
+
+//   res.json({ message: "Intern approved & email sent", intern });
+// } catch (err) {
+//   console.error("Approve Error:", err);
+//   res.status(500).json({ message: "Server error", error: err.message });
+// }
+// });
+router.put(
+  "/accept/:id",
+  upload.fields([
+    { name: "pdf" },
+    { name: "pdf_1" },
+    { name: "pdf_2" },
+  ]),
+  async (req, res) => {
+    try {
+      const { onboardingDate, endDate, internshipType } = req.body;
+
+      const intern = await Intern.findById(req.params.id);
+      if (!intern) {
+        return res.status(404).json({ message: "Intern not found" });
+      }
+
+      if (internshipType && !["Stipend", "Paid"].includes(internshipType)) {
+        return res.status(400).json({ message: "Invalid internship type" });
+      }
+
+      const pdfBuffer  = req.files?.pdf?.[0]?.buffer;
+      const pdf1Buffer = req.files?.pdf_1?.[0]?.buffer;
+      const pdf2Buffer = req.files?.pdf_2?.[0]?.buffer;
+
+      if (!pdfBuffer || !pdf1Buffer || !pdf2Buffer) {
+        return res.status(400).json({ message: "All PDF files are required" });
+      }
+
+      const newId = await generateInternId();
+
+      intern.internid = newId;
+      intern.status = "approved";
+      intern.onboardingDate = onboardingDate;
+      intern.endDate = endDate;
+      if (internshipType) intern.internshipType = internshipType;
+
+      await intern.save();
+
+      await sendEmail({
+        to: intern.email,
+        subject: "Your Intern ID is Ready",
+        html: `
+          <h2>Hi ${intern.fullName},</h2>
+          <p>Your profile has been <b>approved</b> 🎉</p>
+          <p>Your <b>Intern ID</b>: <b>${newId}</b></p>
+          <p>Onboarding Date: <b>${onboardingDate}</b></p>
+          <p>End Date: <b>${endDate}</b></p>
+          <br><p>Regards,<br>HR Team</p>
+        `,
+        attachments: [
+          { filename: `${newId}-Offer-Letter.pdf`, content: pdfBuffer },
+          { filename: `${newId}-Annexure.pdf`, content: pdf1Buffer },
+          { filename: `${newId}-NDA.pdf`, content: pdf2Buffer },
+        ],
+      });
+
+      res.json({ message: "Intern approved & email sent", intern });
+    } catch (err) {
+      console.error("Approve Error:", err);
+      res.status(500).json({ message: "Server error", error: err.message });
+    }
   }
-
-  const newId = await generateInternId();
-  intern.internid = newId;
-  intern.status = "approved";
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
-  };
-
-  intern.onboardingDate = formatDate(onboardingDate);
-  intern.endDate = formatDate(endDate);
-  await intern.save();
-
-  // Fix email attachments - use buffers directly
-  await sendEmail({
-    to: intern.email,
-    subject: "Your Intern ID is Ready",
-    html: `
-      <h2>Hi ${intern.fullName},</h2>
-      <p>Your profile has been <b>approved</b> 🎉</p>
-      <p>Your new <b>Intern ID</b> is: <b>${newId}</b></p>
-      <p>Onboarding Date: <b>${intern.onboardingDate}</b></p>
-      <p>End Date: <b>${intern.endDate}</b></p>
-      <p>Please save this ID — you'll use it for login.</p>
-      <br><p>Regards,<br>HR Team</p>
-    `,
-    attachments: [
-      { filename: `${newId} -Softrate Internship Offer Letter.pdf`, content: pdfBuffer },
-      { filename: `${newId} -Softrate Internship Annexure.pdf`, content: pdf1Buffer },
-      { filename: `${newId} - Softrate Internship NDA.pdf`, content: pdf2Buffer }
-    ]
-  });
-
-  res.json({ message: "Intern approved & email sent", intern });
-} catch (err) {
-  console.error("Approve Error:", err);
-  res.status(500).json({ message: "Server error", error: err.message });
-}
-});
+);
 
 
 router.put("/reject/:id", async (req, res) => {

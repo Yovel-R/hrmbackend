@@ -14,6 +14,8 @@ const InternSchema = new mongoose.Schema({
   onboardingDate: { type: String, default: ""},
   endDate: { type: String, default: ""},
   linkedin: { type: String, required: true },
+  internshipType: { type: String, default: ""},
+
 
 
   // New backend auto-field
