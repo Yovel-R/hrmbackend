@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const EmployeeSchema = new mongoose.Schema({
   // Section 1 – Personal Details
   EmployeeId: { type: String, default: "" },
+  password: { type: String, default: "" },
   status: { type: String, default: "initial" },
   fullName: { type: String, required: true },
   email: { type: String, required: true },
@@ -11,6 +12,7 @@ const EmployeeSchema = new mongoose.Schema({
   emergencyPhone: String,
   dob: Date,
   address: String,
+  role: String,
   linkedin: String,
   gender: String,
   nationality: String,

@@ -212,6 +212,7 @@ app.use('/api/leave', require('./routes/leave.routes'));
 app.use('/api/resignation', require('./routes/resignation.routes'));
 app.use('/api', require('./routes/send-documents'));
 app.use('/api/employee', require('./routes/EmployeeRouter'));
+app.use('/api/employeeAttanance', require('./routes/EmployeeAttendance'));
 
 // ============================
 // Test Route

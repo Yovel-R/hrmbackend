@@ -1,6 +1,7 @@
 const express = require("express");
 const Attendance = require("../models/attendancemodel");
-const ExcelJS = require("exceljs");
+const PDFDocument = require("pdfkit");
+const moment = require("moment");
 
 const router = express.Router();
 
@@ -148,17 +149,26 @@ router.post("/punch-out", async (req, res) => {
 router.get("/intern/:id", async (req, res) => {
   try {
     const internId = req.params.id;
+    const { year, month, from, to } = req.query;  // Add these params
 
-    const attendance = await Attendance.find({ internId }).sort({
-      date: -1,
-    });
+    let query = { internId };
+    
+    if (year && month) {
+      const start = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const end = new Date(parseInt(year), parseInt(month), 0);
+      query.date = { $gte: start, $lte: end };
+    } else if (from && to) {
+      query.date = { $gte: new Date(from), $lte: new Date(to) };
+    }
 
+    const attendance = await Attendance.find(query).sort({ date: -1 });
     return res.json({ attendance });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Server error" });
   }
 });
+
 // 📌 Get Today's Attendance (FIXED)
 router.get("/today/:internId", async (req, res) => {
   const { internId } = req.params;
@@ -169,58 +179,121 @@ router.get("/today/:internId", async (req, res) => {
 });
 
 // 📌 Export Attendance Excel
-router.get("/export/:internId", async (req, res) => {
+router.get("/export/pdf/:internId", async (req, res) => {
   try {
     const { internId } = req.params;
+    const { from, to } = req.query;
 
-    const records = await Attendance.find({ internId }).sort({ date: 1 });
+    if (!from || !to) {
+      return res.status(400).json({ message: "from & to dates required" });
+    }
 
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Attendance");
+    const records = await Attendance.find({
+      internId,
+      date: {
+        $gte: from,
+        $lte: to,
+      },
+    }).sort({ date: 1 });
 
-    sheet.columns = [
-      { header: "Date", key: "date", width: 15 },
-      { header: "Punch In", key: "in", width: 20 },
-      { header: "Punch Out", key: "out", width: 20 },
-      { header: "Work Duration", key: "duration", width: 15 },
-      { header: "Status", key: "status", width: 12 },
-    ];
-
-    records.forEach((r) => {
-      let status = "Absent";
-      if (r.punchInTime && r.punchOutTime) {
-        const diff =
-          (r.punchOutTime - r.punchInTime) / (1000 * 60);
-        status = diff < 360 ? "Short" : "Present";
-      }
-
-      sheet.addRow({
-        date: r.date,
-        in: r.punchInTime
-          ? new Date(r.punchInTime).toLocaleTimeString()
-          : "--",
-        out: r.punchOutTime
-          ? new Date(r.punchOutTime).toLocaleTimeString()
-          : "--",
-        duration: r.duration ?? "--",
-        status,
-      });
-    });
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
+    res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=attendance_${internId}.xlsx`
+      `attachment; filename=attendance_${internId}.pdf`
     );
 
-    await workbook.xlsx.write(res);
-    res.end();
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    doc.pipe(res);
+
+    /* ================= HEADER ================= */
+    doc
+      .fontSize(20)
+      .fillColor("#00657F")
+      .text("Attendance Report", { align: "center" });
+
+    doc.moveDown(0.5);
+
+    doc
+      .fontSize(11)
+      .fillColor("black")
+      .text(`Intern ID : ${internId}`)
+      .text(
+        `Period : ${moment(from).format("DD MMM YYYY")} - ${moment(to).format(
+          "DD MMM YYYY"
+        )}`
+      );
+
+    doc.moveDown(1);
+
+    /* ================= TABLE HEADER ================= */
+    const tableTop = doc.y;
+    const col = {
+      date: 40,
+      in: 160,
+      out: 270,
+      duration: 380,
+      status: 470,
+    };
+
+    doc.font("Helvetica-Bold").fontSize(11);
+    doc.text("Date", col.date, tableTop);
+    doc.text("Punch In", col.in, tableTop);
+    doc.text("Punch Out", col.out, tableTop);
+    doc.text("Hours", col.duration, tableTop);
+    doc.text("Status", col.status, tableTop);
+
+    doc.moveDown(0.5);
+    doc.font("Helvetica");
+
+    /* ================= TABLE ROWS ================= */
+    records.forEach((r) => {
+      const y = doc.y;
+
+      let status = "Absent";
+      if (r.punchInTime && r.punchOutTime) {
+        const mins =
+          (new Date(r.punchOutTime) - new Date(r.punchInTime)) / 60000;
+        status = mins < 360 ? "Short" : "Present";
+      }
+
+      doc.text(moment(r.date).format("DD MMM YYYY"), col.date, y);
+      doc.text(
+        r.punchInTime
+          ? moment(r.punchInTime).format("hh:mm A")
+          : "--",
+        col.in,
+        y
+      );
+      doc.text(
+        r.punchOutTime
+          ? moment(r.punchOutTime).format("hh:mm A")
+          : "--",
+        col.out,
+        y
+      );
+      doc.text(r.duration || "--", col.duration, y);
+      doc.text(status, col.status, y);
+
+      doc.moveDown(0.4);
+
+      // Auto page break
+      if (doc.y > 750) {
+        doc.addPage();
+      }
+    });
+
+    /* ================= FOOTER ================= */
+    doc.moveDown(1);
+    doc
+      .fontSize(9)
+      .fillColor("gray")
+      .text("Generated by SoftPeople HRM", { align: "center" });
+
+    doc.end();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Export failed" });
+    res.status(500).json({ message: "PDF export failed" });
   }
 });
+
 module.exports = router;
