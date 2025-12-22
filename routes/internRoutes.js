@@ -255,22 +255,24 @@ router.put(
 );
 
 
-router.put("/reject/:id", async (req, res) => {
+router.delete("/reject/:id", async (req, res) => {
   try {
-    const intern = await Intern.findByIdAndUpdate(
-      req.params.id,
-      { status: "rejected" },
-      { new: true }
-    );
+    const intern = await Intern.findByIdAndDelete(req.params.id);
 
-    if (!intern) return res.status(404).json({ message: "Intern not found" });
+    if (!intern) {
+      return res.status(404).json({ message: "Intern not found" });
+    }
 
-    res.json({ message: "Intern rejected", intern });
+    res.json({
+      message: "Intern rejected and removed successfully",
+      intern,
+    });
   } catch (err) {
-    console.error("Reject Error:", err);
+    console.error("Reject Delete Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 
 
@@ -279,14 +281,22 @@ router.put("/reject/:id", async (req, res) => {
 async function generateInternId() {
   const year = (new Date().getFullYear() % 100).toString();
 
-  const counter = await Counter.findOneAndUpdate(
-    { year },
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true }
-  );
+  let counter;
+  let internId;
 
-  return `${year}${String(counter.seq).padStart(3, "0")}`;
+  do {
+    counter = await Counter.findOneAndUpdate(
+      { year },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+
+    internId = `${year}${String(counter.seq).padStart(3, "0")}`;
+  } while (await Intern.exists({ internid: internId }));
+
+  return internId;
 }
+
 
 
 router.post("/login", async (req, res) => {
