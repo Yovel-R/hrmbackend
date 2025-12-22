@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 const router = express.Router();
 const multer = require('multer');
 const upload = multer();
-
+const Counter = require("../models/counter.model");
 
 
 router.post("/add", async (req, res) => {
@@ -277,22 +277,15 @@ router.put("/reject/:id", async (req, res) => {
 // id generator
 
 async function generateInternId() {
-  const yearShort = new Date().getFullYear() % 100; // 25 as number
-  const year = yearShort.toString();                // "25" as string
+  const year = (new Date().getFullYear() % 100).toString();
 
+  const counter = await Counter.findOneAndUpdate(
+    { year },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
 
-  const lastIntern = await Intern.findOne({
-    internid: { $regex: "^" + year }
-  }).sort({ internid: -1 });
-
-  let next = 1;
-
-  if (lastIntern) {
-    const lastNumber = parseInt(lastIntern.internid.slice(4)); 
-    next = lastNumber + 1;
-  }
-
-  return `${year}${String(next).padStart(3, "0")}`;
+  return `${year}${String(counter.seq).padStart(3, "0")}`;
 }
 
 

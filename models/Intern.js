@@ -1,7 +1,11 @@
 const mongoose = require("mongoose");
 
 const InternSchema = new mongoose.Schema({
-  internid: { type: String, default: "" },
+  internid: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   fullName: { type: String, required: true },
   college: { type: String, required: true },
   year: { type: String, required: true },
