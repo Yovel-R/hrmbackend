@@ -7,6 +7,72 @@ const LeaveCounter = require("../models/leaveCounter.model");
 /* ============================
    APPLY LEAVE
 ============================ */
+// router.post("/apply", async (req, res) => {
+//   try {
+//     const data = req.body;
+
+//     const fromDate = new Date(data.fromDate);
+//     const toDate = new Date(data.toDate);
+
+//     const fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+//     const toDay = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+
+//     // 1️⃣ OVERLAPPING LEAVE CHECK
+//     const overlapping = await EmployeeLeave.find({
+//       employeeId: data.employeeId,
+//       status: { $ne: "rejected" },
+//       fromDate: { $lte: toDay },
+//       toDate: { $gte: fromDay },
+//     });
+
+//     if (overlapping.length > 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "You already have an overlapping leave.",
+//       });
+//     }
+
+//     // 2️⃣ FETCH LEAVE COUNTER (BALANCE)
+//     const counter = await LeaveCounter.findOne({
+//       employeeId: data.employeeId,
+//       leaveType: data.leaveType,
+//     });
+
+//     if (!counter) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Leave balance not found",
+//       });
+//     }
+
+//     // 3️⃣ ✅ INSUFFICIENT LEAVE BALANCE CHECK
+//     if (Number(data.numberOfDays) > counter.balance) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Insufficient leave balance",
+//       });
+//     }
+
+//     // 4️⃣ CREATE LEAVE (NO DEDUCTION HERE)
+//     const leave = await EmployeeLeave.create({
+//       employeeId: data.employeeId,
+//       employeeName: data.employeeName,
+//       leaveType: data.leaveType,
+//       fromDate: fromDay,
+//       toDate: toDay,
+//       numberOfDays: Number(data.numberOfDays),
+//       reason: data.reason,
+//       status: "pending",
+//       rejectionReason: "",
+//       perDayDurations: data.perDayDurations || {},
+//     });
+
+//     res.json({ success: true, leaveId: leave._id });
+//   } catch (err) {
+//     console.error("Leave apply error:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// });
 router.post("/apply", async (req, res) => {
   try {
     const data = req.body;
@@ -17,7 +83,9 @@ router.post("/apply", async (req, res) => {
     const fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
     const toDay = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
 
-    // 1️⃣ OVERLAPPING LEAVE CHECK
+    /* ============================
+       OVERLAPPING LEAVE CHECK
+    ============================ */
     const overlapping = await EmployeeLeave.find({
       employeeId: data.employeeId,
       status: { $ne: "rejected" },
@@ -32,32 +100,54 @@ router.post("/apply", async (req, res) => {
       });
     }
 
-    // 2️⃣ FETCH LEAVE COUNTER (BALANCE)
-    const counter = await LeaveCounter.findOne({
-      employeeId: data.employeeId,
-      leaveType: data.leaveType,
-    });
+    /* ============================
+       MATERNITY LEAVE (NO BALANCE CHECK)
+    ============================ */
+    const isMaternityLeave =
+      data.leaveType?.trim().toLowerCase() === "maternity leave";
 
-    if (!counter) {
-      return res.status(404).json({
-        success: false,
-        message: "Leave balance not found",
+    let normalizedLeaveType = data.leaveType;
+
+    if (!isMaternityLeave) {
+      /* ============================
+         FETCH CURRENT CYCLE COUNTER
+      ============================ */
+      const today = new Date();
+
+      const counter = await LeaveCounter.findOne({
+        employeeId: data.employeeId,
+        leaveType: { $regex: `^${data.leaveType.trim()}$`, $options: "i" },
+        cycleStartDate: { $lte: today },
+        nextResetDate: { $gte: today },
       });
+
+      if (!counter) {
+        return res.status(404).json({
+          success: false,
+          message: "Leave balance not found",
+        });
+      }
+
+      /* ============================
+         ❌ BLOCK APPLY IF INSUFFICIENT
+      ============================ */
+      if (Number(data.numberOfDays) > counter.balance) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient leave balance. Available: ${counter.balance}`,
+        });
+      }
+
+      normalizedLeaveType = counter.leaveType; // normalized
     }
 
-    // 3️⃣ ✅ INSUFFICIENT LEAVE BALANCE CHECK
-    if (Number(data.numberOfDays) > counter.balance) {
-      return res.status(400).json({
-        success: false,
-        message: "Insufficient leave balance",
-      });
-    }
-
-    // 4️⃣ CREATE LEAVE (NO DEDUCTION HERE)
+    /* ============================
+       CREATE LEAVE (NO DEDUCTION)
+    ============================ */
     const leave = await EmployeeLeave.create({
       employeeId: data.employeeId,
       employeeName: data.employeeName,
-      leaveType: data.leaveType,
+      leaveType: normalizedLeaveType,
       fromDate: fromDay,
       toDate: toDay,
       numberOfDays: Number(data.numberOfDays),

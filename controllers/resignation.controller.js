@@ -91,7 +91,7 @@ exports.getPendingResignations = async (req, res) => {
 exports.updateResignationStatus = async (req, res) => {
   try {
     const { action, id } = req.params;
-    const { title } = req.body;
+    
 
     const resignation = await Resignation.findById(id);
     if (!resignation) return res.status(404).json({ message: "Resignation not found" });
