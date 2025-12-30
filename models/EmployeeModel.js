@@ -8,6 +8,7 @@ const EmployeeSchema = new mongoose.Schema({
   fullName: { type: String, required: true },
   email: { type: String, required: true },
   phone: { type: String, required: true },
+  onboardingDate: { type: Date },
   emergencyName: String,
   emergencyPhone: String,
   dob: Date,

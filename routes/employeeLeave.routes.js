@@ -1,31 +1,25 @@
 const express = require("express");
 const router = express.Router();
-const EmployeeLeave = require("../models/employeeLeave.model");
 
-// POST /api/employee-leave/apply
+const EmployeeLeave = require("../models/employeeLeave.model");
+const LeaveCounter = require("../models/leaveCounter.model");
+
+/* ============================
+   APPLY LEAVE
+============================ */
 router.post("/apply", async (req, res) => {
   try {
     const data = req.body;
 
-    const employeeId = data.employeeId;
     const fromDate = new Date(data.fromDate);
     const toDate = new Date(data.toDate);
 
-    // normalize dates (remove time)
-    const fromDay = new Date(
-      fromDate.getFullYear(),
-      fromDate.getMonth(),
-      fromDate.getDate()
-    );
-    const toDay = new Date(
-      toDate.getFullYear(),
-      toDate.getMonth(),
-      toDate.getDate()
-    );
+    const fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+    const toDay = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
 
-    // overlap check (ignore rejected)
+    // 1️⃣ OVERLAPPING LEAVE CHECK
     const overlapping = await EmployeeLeave.find({
-      employeeId,
+      employeeId: data.employeeId,
       status: { $ne: "rejected" },
       fromDate: { $lte: toDay },
       toDate: { $gte: fromDay },
@@ -34,13 +28,34 @@ router.post("/apply", async (req, res) => {
     if (overlapping.length > 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "You already have a pending/approved leave that overlaps these dates.",
+        message: "You already have an overlapping leave.",
       });
     }
 
-    const leave = new EmployeeLeave({
-      employeeId,
+    // 2️⃣ FETCH LEAVE COUNTER (BALANCE)
+    const counter = await LeaveCounter.findOne({
+      employeeId: data.employeeId,
+      leaveType: data.leaveType,
+    });
+
+    if (!counter) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave balance not found",
+      });
+    }
+
+    // 3️⃣ ✅ INSUFFICIENT LEAVE BALANCE CHECK
+    if (Number(data.numberOfDays) > counter.balance) {
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient leave balance",
+      });
+    }
+
+    // 4️⃣ CREATE LEAVE (NO DEDUCTION HERE)
+    const leave = await EmployeeLeave.create({
+      employeeId: data.employeeId,
       employeeName: data.employeeName,
       leaveType: data.leaveType,
       fromDate: fromDay,
@@ -52,67 +67,131 @@ router.post("/apply", async (req, res) => {
       perDayDurations: data.perDayDurations || {},
     });
 
+    res.json({ success: true, leaveId: leave._id });
+  } catch (err) {
+    console.error("Leave apply error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ============================
+   GET LEAVE BALANCE
+============================ */
+router.get("/balance/:employeeId", async (req, res) => {
+  try {
+    const counters = await LeaveCounter.find({
+      employeeId: req.params.employeeId,
+    })
+      .select("leaveType balance totalAllowed used")
+      .lean();
+
+    if (!counters.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave balance not found",
+      });
+    }
+
+    res.json({ success: true, data: counters });
+  } catch (err) {
+    console.error("Leave balance error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+/* ============================
+   UPDATE LEAVE BALANCE
+============================ */
+
+router.put("/update-status/:leaveId", async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const leave = await EmployeeLeave.findById(req.params.leaveId);
+    if (!leave) {
+      return res.status(404).json({ success: false, message: "Leave not found" });
+    }
+
+    leave.status = status;
     await leave.save();
 
-    res.status(200).json({
-      success: true,
-      message: "Leave applied successfully",
-      leaveId: leave._id,
-    });
+    // ✅ Reduce balance ONLY when approved
+    if (status === "approved") {
+      const counter = await LeaveCounter.findOne({
+        employeeId: leave.employeeId,
+        leaveType: leave.leaveType,
+      });
+
+      if (!counter) {
+        return res.status(404).json({
+          success: false,
+          message: "Leave balance not found",
+        });
+      }
+
+      counter.used += leave.numberOfDays;
+      counter.balance = counter.totalAllowed - counter.used;
+
+      await counter.save();
+    }
+
+    res.json({ success: true, message: "Leave updated successfully" });
   } catch (err) {
-    console.error("Employee leave apply error:", err);
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+/* ============================
+   GET EMPLOYEE LEAVES
+============================ */
+router.get("/employee/:employeeId", async (req, res) => {
+  try {
+    const leaves = await EmployeeLeave.find({
+      employeeId: req.params.employeeId,
+    }).sort({ fromDate: -1 });
+
+    res.json(leaves);
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-// GET /api/employee-leave/pending
+
+/* ============================
+   GET PENDING LEAVES (ADMIN)
+============================ */
 router.get("/pending", async (req, res) => {
   try {
-    const pendingLeaves = await EmployeeLeave.find({ status: "pending" })
+    const leaves = await EmployeeLeave.find({ status: "pending" })
       .sort({ createdAt: -1 });
 
-    res.status(200).json(pendingLeaves);
+    res.json(leaves);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-// PUT /api/employee-leave/:id
+
+/* ============================
+   UPDATE LEAVE STATUS
+============================ */
 router.put("/:id", async (req, res) => {
   try {
     const { status, rejectionReason } = req.body;
 
     const leave = await EmployeeLeave.findById(req.params.id);
     if (!leave) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Leave not found" });
+      return res.status(404).json({ success: false, message: "Leave not found" });
     }
 
     leave.status = status;
-
-    if (status === "rejected") {
-      leave.rejectionReason = rejectionReason || "";
-    } else {
-      leave.rejectionReason = "";
-    }
+    leave.rejectionReason = status === "rejected" ? rejectionReason || "" : "";
 
     await leave.save();
 
-    res.status(200).json({ success: true, leave });
+    res.json({ success: true, leave });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-// GET /api/employee-leave/employee/:employeeId
-router.get("/employee/:employeeId", async (req, res) => {
-  try {
-    const employeeId = req.params.employeeId;
 
-    const leaves = await EmployeeLeave.find({ employeeId })
-      .sort({ fromDate: -1 });
-
-    res.status(200).json(leaves);
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 module.exports = router;

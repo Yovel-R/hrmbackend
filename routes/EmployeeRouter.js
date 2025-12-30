@@ -1,60 +1,72 @@
 const express = require("express");
 const Employee = require("../models/EmployeeModel");
 const sendEmail = require("../utilities/sendEmail");
-const multer = require("multer");
+const Counter = require("../models/EmployeeCounterModel.js");
+const LeaveCounter = require("../models/leaveCounter.model"); 
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
 /* ============================
    ADD / ONBOARD (INITIAL)
 ============================ */
 const RECEIVER_EMAIL = process.env.RECIVER_EMAIL_USER;
 
-router.post(
-  "/add",
-  upload.any(), // parse multipart/form-data
-  async (req, res) => {
-    try {
-      console.log("BODY:", req.body);   // employee fields
-      console.log("FILES:", req.files); // uploaded files
+router.put("/accept/:id", async (req, res) => {
+  try {
+    const { onboardingDate } = req.body;
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
 
-      // Optional: save employee info
-      const employee = new Employee({
-        ...req.body,
-        status: "initial", // you can skip if you don't want to store
-      });
+    // Generate unique Employee ID
+    const newEmployeeId = await generateEmployeeId();
+    employee.EmployeeId = newEmployeeId;
+    employee.status = "approved";
+    employee.onboardingDate = onboardingDate;
 
-      await employee.save(); // optional
+    await employee.save();
 
-      // Map uploaded files to attachments
-      const attachments = req.files?.map(file => ({
-        filename: file.originalname,
-        content: file.buffer,
-      }));
+    // Initialize leave counter
+    const startDate = new Date(onboardingDate);
+    const nextResetDate = new Date(startDate);
+    nextResetDate.setFullYear(startDate.getFullYear() + 1);
 
-      // Send email to receiver
-      await sendEmail({
-        to: RECEIVER_EMAIL,
-        subject: "New Employee Submission",
-        html: `
-          <h3>New employee submission received</h3>
-          <p>Name: ${employee.fullName}</p>
-          <p>Email: ${employee.email}</p>
-          <p>Phone: ${employee.phone}</p>
-        `,
-        attachments,
-      });
+    const leaveConfigs = [
+      { type: "Casual Leave", days: 9 },
+      { type: "Sick Leave", days: 12 },
+      { type: "Bereavement Leave", days: 3 },
+    ];
 
-      res.status(200).json({ message: "Employee submitted & email sent" });
-    } catch (err) {
-      console.error("Employee Add Error:", err);
-      res.status(500).json({ message: "Server error", error: err.message });
-    }
+    const records = leaveConfigs.map(l => ({
+      employeeId: newEmployeeId,
+      leaveType: l.type,
+      totalAllowed: l.days,
+      used: 0,
+      balance: l.days,
+      cycleStartDate: startDate,
+      nextResetDate,
+    }));
+
+    await LeaveCounter.insertMany(records, { ordered: false }).catch(() => {});
+
+    // Send approval email (no attachments)
+    await sendEmail({
+      to: employee.email,
+      subject: "Your Employee ID is Ready",
+      html: `<h2>Hi ${employee.fullName},</h2>
+             <p>Your profile has been <b>approved</b> 🎉</p>
+             <p><b>Employee ID:</b> ${newEmployeeId}</p>
+             <p><b>Onboarding Date:</b> ${onboardingDate}</p>
+             <br><p>Regards,<br>HR Team</p>`,
+    });
+
+    res.json({ message: "Employee approved & email sent", employee });
+  } catch (err) {
+    console.error("Employee Accept Error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
-);
+});
 
-module.exports = router;
+
 /* ============================
    GET INITIAL EMPLOYEES
 ============================ */
@@ -70,8 +82,7 @@ router.get("/all/active", async (req, res) => {
   try {
     const { range = "thisMonth", status = "all" } = req.query;
 
-    const statusFilter =
-      status === "all" ? ["approved", "ongoing"] : [status];
+    const statusFilter = status === "all" ? ["approved", "ongoing"] : [status];
 
     const query = { status: { $in: statusFilter } };
 
@@ -84,13 +95,24 @@ router.get("/all/active", async (req, res) => {
     } else if (range === "sixMonths") {
       start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
       end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    } else if (range === "all") {
+      // ✅ ALL TIME - no date filter
+      start = null;
+      end = null;
     }
 
+    // ✅ FIXED: Use submittedAt instead of createdAt
     if (start && end) {
-      query.createdAt = { $gte: start, $lte: end };
+      query.submittedAt = { $gte: start, $lte: end };
     }
 
-    const employees = await Employee.find(query).sort({ createdAt: -1 });
+    console.log("Query:", JSON.stringify(query)); // Debug log
+
+    const employees = await Employee.find(query)
+      .select('EmployeeId fullName status role submittedAt') // Limit fields
+      .sort({ submittedAt: -1 }); // ✅ Sort by submittedAt
+
+    console.log(`Found ${employees.length} employees`); // Debug log
     res.json(employees);
   } catch (err) {
     console.error("Fetch Active Employees Error:", err);
@@ -98,82 +120,66 @@ router.get("/all/active", async (req, res) => {
   }
 });
 
+
 /* ============================
-   ACCEPT EMPLOYEE (PDF + MAIL)
+   ACCEPT EMPLOYEE ( MAIL)
 ============================ */
-router.put(
-  "/accept/:id",
-  upload.fields([
-    { name: "offerLetter" },
-    { name: "appointmentLetter" },
-    { name: "nda" },
-  ]),
-  async (req, res) => {
-    try {
-      const { onboardingDate } = req.body;
+router.put("/accept/:id", async (req, res) => {
+  try {
+    const { onboardingDate } = req.body;
 
-      const employee = await Employee.findById(req.params.id);
-      if (!employee) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-
-      const offer = req.files?.offerLetter?.[0]?.buffer;
-      const appointment = req.files?.appointmentLetter?.[0]?.buffer;
-      const nda = req.files?.nda?.[0]?.buffer;
-
-      if (!offer || !appointment || !nda) {
-        return res.status(400).json({ message: "All PDFs required" });
-      }
-
-      const newEmployeeId = await generateEmployeeId();
-
-      employee.EmployeeId = newEmployeeId;
-      employee.status = "approved";
-      employee.onboardingDate = onboardingDate;
-
-      await employee.save();
-
-      await sendEmail({
-        to: employee.email,
-        subject: "Your Employee ID is Ready",
-        html: `
-          <h2>Hi ${employee.fullName},</h2>
-          <p>Your profile has been <b>approved</b> 🎉</p>
-          <p><b>Employee ID:</b> ${newEmployeeId}</p>
-          <p><b>Onboarding Date:</b> ${onboardingDate}</p>
-          <br><p>Regards,<br>HR Team</p>
-        `,
-        attachments: [
-          { filename: `${newEmployeeId}-Offer-Letter.pdf`, content: offer },
-          { filename: `${newEmployeeId}-Appointment.pdf`, content: appointment },
-          { filename: `${newEmployeeId}-NDA.pdf`, content: nda },
-        ],
-      });
-
-      res.json({ message: "Employee approved & email sent", employee });
-    } catch (err) {
-      console.error("Employee Accept Error:", err);
-      res.status(500).json({ message: "Server error", error: err.message });
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
     }
+
+    const newEmployeeId = await generateEmployeeId();
+
+    employee.EmployeeId = newEmployeeId;
+    employee.status = "approved";
+    employee.onboardingDate = onboardingDate;
+
+    await employee.save();
+
+    await sendEmail({
+      to: employee.email,
+      subject: "Employee Approval Confirmation",
+      html: `
+        <h2>Hi ${employee.fullName},</h2>
+        <p>Your profile has been <b>approved</b> 🎉</p>
+        <p><b>Employee ID:</b> ${newEmployeeId}</p>
+        <p><b>Onboarding Date:</b> ${onboardingDate}</p>
+        <br>
+        <p>Our HR team will share further details soon.</p>
+        <br>
+        <p>Regards,<br>HR Team</p>
+      `,
+    });
+
+    res.status(200).json({ message: "Employee approved & mail sent" });
+  } catch (err) {
+    console.error("Accept Error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-);
+});
 
 /* ============================
    REJECT EMPLOYEE
 ============================ */
-router.put("/reject/:id", async (req, res) => {
-  const employee = await Employee.findByIdAndUpdate(
-    req.params.id,
-    { status: "rejected" },
-    { new: true }
-  );
+router.delete("/delete/:id", async (req, res) => {
+  try {
+    const employee = await Employee.findByIdAndDelete(req.params.id);
 
-  if (!employee) {
-    return res.status(404).json({ message: "Employee not found" });
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    res.json({ message: "Employee deleted successfully", employee });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
   }
-
-  res.json({ message: "Employee rejected", employee });
 });
+
 
 /* ============================
    LOGIN (SAME AS INTERN)
@@ -218,24 +224,68 @@ router.get("/get/:employeeId", async (req, res) => {
   res.json({ employee });
 });
 
+/* ============================
+   GET EMPLOYEE BY ID 'terminated', 'resigned', 'went-off'
+============================ */
+router.get('/went-off', async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    // Base query for employees who left
+    let query = {
+      status: { $in: ['terminated', 'resigned', 'went-off'] }, // adjust statuses
+      // Add end date or resignation date field
+      'endDate': { $exists: true } // or resignationDate, etc.
+    };
+
+    if (year && year !== '0') {
+      query.endDate = { 
+        ...query.endDate,
+        $year: parseInt(year)
+      };
+    }
+    
+    if (month && month !== '0') {
+      query.endDate = {
+        ...query.endDate,
+        $month: parseInt(month)
+      };
+    }
+
+    const employees = await Employee.find(query)
+      .select('EmployeeId fullName role endDate status')
+      .sort({ endDate: -1 })
+      .lean();
+
+    res.json(employees);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 /* ============================
    EMPLOYEE ID GENERATOR
 ============================ */
+
+
 async function generateEmployeeId() {
-  const year = new Date().getFullYear() % 100; // 25
-  const prefix = `STP${year}`;
+  const fullYear = new Date().getFullYear();   // e.g., 2026
+  const prefix = `STP${fullYear % 100}`;      // STP26
 
-  const last = await Employee.findOne({
-    EmployeeId: { $regex: `^${prefix}` },
-  }).sort({ EmployeeId: -1 });
+  // Find counter for the current year, increment seq, create if not exists
+  const counter = await EmployeeCounter.findOneAndUpdate(
+    { year: fullYear },
+    { $inc: { seq: 1 }, $setOnInsert: { year: fullYear } },
+    { new: true, upsert: true }  // return the updated/new doc
+  );
 
-  let next = 1;
-  if (last?.EmployeeId) {
-    next = parseInt(last.EmployeeId.slice(prefix.length)) + 1;
-  }
-
-  return `${prefix}${String(next).padStart(3, "0")}`;
+  // Pad seq to 2 or 3 digits (e.g., 01, 02, 07)
+  return `${prefix}${String(counter.seq).padStart(2, "0")}`;
 }
+
+
+
+
+
 
 module.exports = router;
