@@ -279,7 +279,7 @@ router.delete("/reject/:id", async (req, res) => {
 // id generator
 
 async function generateInternId() {
-  const year = (new Date().getFullYear() % 100).toString(); // "25", "26"
+  const year = (new Date().getFullYear() % 100).toString();
 
   let counter;
   let internId;
@@ -287,24 +287,15 @@ async function generateInternId() {
   do {
     counter = await Counter.findOneAndUpdate(
       { year },
-      {
-        $inc: { seq: 1 },
-        $setOnInsert: { year, seq: 0 }, // 👈 important for new year
-      },
-      {
-        new: true,
-        upsert: true,
-      }
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
     );
 
-    // Result: 25001, 25002 → 26001, 26002
     internId = `${year}${String(counter.seq).padStart(3, "0")}`;
-
   } while (await Intern.exists({ internid: internId }));
 
   return internId;
 }
-
 
 
 

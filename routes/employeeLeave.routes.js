@@ -171,22 +171,25 @@ router.get("/pending", async (req, res) => {
   }
 });
 
+
 /* ============================
    UPDATE LEAVE STATUS
+   APPROVE / REJECT
 ============================ */
 router.put("/:id", async (req, res) => {
   try {
     const { status, rejectionReason } = req.body;
 
-    console.log("➡️ Update leave request received");
-    console.log("Status to set:", status);
+    if (!["approved", "rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status value",
+      });
+    }
 
     const leave = await EmployeeLeave.findById(req.params.id);
 
-    console.log("Fetched leave:", leave);
-
     if (!leave) {
-      console.log("❌ Leave not found");
       return res.status(404).json({
         success: false,
         message: "Leave not found",
@@ -195,31 +198,23 @@ router.put("/:id", async (req, res) => {
 
     // Prevent double processing
     if (leave.status !== "pending") {
-      console.log("⚠️ Leave already processed:", leave.status);
       return res.status(400).json({
         success: false,
         message: "Leave already processed",
       });
     }
 
-    // ✅ IF APPROVED → UPDATE BALANCE
+    // ✅ If approved → update leave counter
     if (status === "approved") {
-      const normalizedLeaveType = leave.leaveType.trim();
-
-      console.log("🔍 Matching LeaveCounter with:");
-      console.log("employeeId:", leave.employeeId);
-      console.log("leaveType:", JSON.stringify(normalizedLeaveType));
-      console.log("numberOfDays:", leave.numberOfDays);
-
+      const today = new Date();
       const counter = await LeaveCounter.findOne({
         employeeId: leave.employeeId,
-        leaveType: normalizedLeaveType,
+        leaveType: leave.leaveType.trim().toLowerCase(),
+        cycleStartDate: { $lte: today },
+        nextResetDate: { $gte: today },
       });
 
-      console.log("LeaveCounter found:", counter);
-
       if (!counter) {
-        console.log("❌ LeaveCounter NOT FOUND");
         return res.status(404).json({
           success: false,
           message: "Leave balance not found",
@@ -227,8 +222,6 @@ router.put("/:id", async (req, res) => {
       }
 
       if (leave.numberOfDays > counter.balance) {
-        console.log("❌ Insufficient balance");
-        console.log("Balance:", counter.balance);
         return res.status(400).json({
           success: false,
           message: "Insufficient leave balance",
@@ -237,21 +230,14 @@ router.put("/:id", async (req, res) => {
 
       counter.used += leave.numberOfDays;
       counter.balance -= leave.numberOfDays;
-
-      console.log("✅ Updating LeaveCounter to:");
-      console.log("used:", counter.used);
-      console.log("balance:", counter.balance);
-
       await counter.save();
-      console.log("✅ LeaveCounter saved successfully");
     }
 
-    // Update leave status
+    // ✅ Update leave status & rejection reason
     leave.status = status;
     leave.rejectionReason = status === "rejected" ? rejectionReason || "" : "";
-    await leave.save();
 
-    console.log("✅ Leave status updated successfully");
+    await leave.save();
 
     res.json({
       success: true,
@@ -259,10 +245,17 @@ router.put("/:id", async (req, res) => {
       leave,
     });
   } catch (err) {
-    console.error("🔥 Update leave status error:", err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Leave Update Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
   }
 });
+
+
+module.exports = router;
 
 
 module.exports = router;
