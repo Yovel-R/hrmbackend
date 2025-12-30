@@ -37,7 +37,7 @@ router.post("/apply", async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "You already have a leave request (pending/accepted) that overlaps these dates.",
+          "You already have a leave request that overlaps these dates.",
       });
     }
 

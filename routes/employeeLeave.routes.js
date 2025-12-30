@@ -178,17 +178,21 @@ router.get("/pending", async (req, res) => {
 ============================ */
 router.put("/:id", async (req, res) => {
   try {
-    const { status, rejectionReason } = req.body;
+    let { status, rejectionReason } = req.body;
 
-    if (!["approved", "rejected"].includes(status)) {
+    // Convert "approved" from frontend to valid enum "accepted"
+    if (status === "approved") status = "accepted";
+
+    // Validate status
+    if (!["accepted", "rejected"].includes(status)) {
       return res.status(400).json({
         success: false,
         message: "Invalid status value",
       });
     }
 
+    // Find the leave request
     const leave = await EmployeeLeave.findById(req.params.id);
-
     if (!leave) {
       return res.status(404).json({
         success: false,
@@ -204,12 +208,14 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // ✅ If approved → update leave counter
-    if (status === "approved") {
+    // ✅ If accepted → update leave counter
+    if (status === "accepted") {
       const today = new Date();
+
+      // Find leave counter (case-insensitive)
       const counter = await LeaveCounter.findOne({
         employeeId: leave.employeeId,
-        leaveType: leave.leaveType.trim().toLowerCase(),
+        leaveType: { $regex: `^${leave.leaveType.trim()}$`, $options: "i" },
         cycleStartDate: { $lte: today },
         nextResetDate: { $gte: today },
       });
@@ -221,19 +227,27 @@ router.put("/:id", async (req, res) => {
         });
       }
 
-      if (leave.numberOfDays > counter.balance) {
+      // Atomic update to prevent race conditions
+      const updatedCounter = await LeaveCounter.findOneAndUpdate(
+        {
+          _id: counter._id,
+          balance: { $gte: leave.numberOfDays }, // ensure enough balance
+        },
+        {
+          $inc: { used: leave.numberOfDays, balance: -leave.numberOfDays },
+        },
+        { new: true }
+      );
+
+      if (!updatedCounter) {
         return res.status(400).json({
           success: false,
           message: "Insufficient leave balance",
         });
       }
-
-      counter.used += leave.numberOfDays;
-      counter.balance -= leave.numberOfDays;
-      await counter.save();
     }
 
-    // ✅ Update leave status & rejection reason
+    // Update leave status and rejection reason
     leave.status = status;
     leave.rejectionReason = status === "rejected" ? rejectionReason || "" : "";
 
@@ -254,8 +268,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-
-module.exports = router;
 
 
 module.exports = router;
