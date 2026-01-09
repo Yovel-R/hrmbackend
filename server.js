@@ -34,6 +34,7 @@ app.use("/api/employee-reviews", require("./routes/employeeReview.routes"));
 app.use("/api/employee-resignations", require("./routes/employee-resignation-routes"));
 app.use('/api/employee-terminations', require('./routes/employeeTermination.routes'));
 app.use('/api/leave-counter', require('./routes/leaveCounter.routes'));
+app.use('/api/policy', require('./routes/policyRoutes'));
 
 
 

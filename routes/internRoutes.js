@@ -75,7 +75,7 @@ router.get("/all/active", async (req, res) => {
     const { range = "thisMonth", status = "all" } = req.query;
 
     const statusFilter =
-      status === "all" ? ["approved", "ongoing"] : [status];
+      status === "all" ? ["approved", "ongoing", "remote"] : [status];
 
     const query = { status: { $in: statusFilter } };
 
