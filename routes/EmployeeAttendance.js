@@ -3,6 +3,8 @@ const Attendance = require("../models/Employeeattendancemodel");
 const PDFDocument = require("pdfkit");
 const moment = require("moment");
 const Employee = require("../models/EmployeeModel");
+const ExcelJS = require("exceljs");
+
 
 const router = express.Router();
 
@@ -245,194 +247,115 @@ router.get("/export/pdf/employee/:employeeId", async (req, res) => {
 
 
 
-router.get("/export/pdf/all", async (req, res) => {
+
+
+router.get("/export/excel/all", async (req, res) => {
   try {
     const { from, to } = req.query;
     if (!from || !to) {
       return res.status(400).json({ message: "from & to dates required" });
     }
 
-    /* ================= FETCH DATA ================= */
-
+    // ================= FETCH DATA =================
     const attendances = await Attendance.find({
       date: { $gte: from, $lte: to },
     })
       .sort({ employeeId: 1, date: 1 })
       .lean();
 
-    const employeeIds = [
-      ...new Set(attendances.map((a) => a.employeeId)),
-    ];
+    // Unique Employee IDs from Attendance
+    const employeeIds = [...new Set(attendances.map((a) => a.employeeId))];
 
+    // Fetch Employee details with correct field names
     const employees = await Employee.find(
-      { employeeId: { $in: employeeIds } },
-      { employeeId: 1, name: 1 }
+      { EmployeeId: { $in: employeeIds } }, // <- correct field
+      { fullName: 1, EmployeeId: 1 }        // <- only fields we need
     ).lean();
 
+    // Map EmployeeId to fullName
     const employeeMap = {};
     employees.forEach((e) => {
-      employeeMap[e.employeeId] = e.name;
+      employeeMap[e.EmployeeId] = e.fullName;
     });
 
-    /* ================= PDF SETUP ================= */
+    // ================= EXCEL SETUP =================
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Attendance Report");
 
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=attendance_${moment(from).format(
-        "DDMMYY"
-      )}_${moment(to).format("DDMMYY")}.pdf`
-    );
+    // Title
+    sheet.mergeCells("A1:G1");
+    sheet.getCell("A1").value = "All Employees Attendance Report";
+    sheet.getCell("A1").alignment = { horizontal: "center" };
+    sheet.getCell("A1").font = { size: 16, bold: true, color: { argb: "FF00657F" } };
 
-    const doc = new PDFDocument({ size: "A4", margin: 40 });
-    doc.pipe(res);
+    // Period
+    sheet.mergeCells("A2:G2");
+    sheet.getCell("A2").value = `Period : ${moment(from).format("DD MMM YYYY")} - ${moment(to).format("DD MMM YYYY")}`;
+    sheet.getCell("A2").alignment = { horizontal: "center" };
+    sheet.getCell("A2").font = { size: 12 };
 
-    const PAGE_BOTTOM = 760;
-    const ROW_HEIGHT = 18;
-    const LEFT = 40;
+    sheet.addRow([]);
 
-    const col = {
-      date: 40,
-      in: 150,
-      out: 260,
-      hrs: 360,
-      status: 450,
-    };
+    // Table columns
+    sheet.columns = [
+      { header: "Employee Name", key: "name", width: 25 },
+      { header: "Employee ID", key: "id", width: 15 },
+      { header: "Date", key: "date", width: 15 },
+      { header: "Punch In", key: "in", width: 12 },
+      { header: "Punch Out", key: "out", width: 12 },
+      { header: "Hours", key: "hrs", width: 10 },
+      { header: "Status", key: "status", width: 12 },
+    ];
 
-    /* ================= REPORT HEADER ================= */
-
-    doc
-      .fontSize(18)
-      .fillColor("#00657F")
-      .text("All Employees Attendance Report", {
-        align: "center",
-        width: 520,
-      });
-
-    doc
-      .moveDown(0.4)
-      .fontSize(10)
-      .fillColor("black")
-      .text(
-        `Period : ${moment(from).format("DD MMM YYYY")} - ${moment(to).format(
-          "DD MMM YYYY"
-        )}`,
-        { align: "center", width: 520 }
-      );
-
-    doc.moveDown(1);
-
-    /* ================= HELPERS ================= */
-
-    const ensurePage = (space = 80) => {
-      if (doc.y + space > PAGE_BOTTOM) {
-        doc.addPage();
-      }
-    };
-
-    const drawTableHeader = () => {
-      const y = doc.y;
-
-      doc.font("Helvetica-Bold").fontSize(10);
-      doc.text("Date", col.date, y);
-      doc.text("Punch In", col.in, y);
-      doc.text("Punch Out", col.out, y);
-      doc.text("Hours", col.hrs, y);
-      doc.text("Status", col.status, y);
-
-      doc
-        .moveTo(LEFT, y + 14)
-        .lineTo(555, y + 14)
-        .stroke();
-
-      doc.font("Helvetica");
-      doc.y = y + 20;
-    };
-
-    /* ================= DATA LOOP ================= */
-
-    let currentEmployee = null;
-
+    // Fill rows
     for (const r of attendances) {
-      if (currentEmployee !== r.employeeId) {
-        currentEmployee = r.employeeId;
-
-        ensurePage(120);
-
-        doc
-          .fontSize(12)
-          .fillColor("#00657F")
-          .text(
-            `Employee Name : ${employeeMap[r.employeeId] || "-"}`,
-            LEFT,
-            doc.y,
-            { align: "left", width: 500 }
-          );
-
-        doc
-          .fontSize(11)
-          .fillColor("black")
-          .text(`Employee ID : ${r.employeeId}`, LEFT, doc.y, {
-            align: "left",
-            width: 500,
-          });
-
-        doc.moveDown(0.6);
-        drawTableHeader();
-      }
-
-      ensurePage(ROW_HEIGHT);
-
-      const y = doc.y;
+      const punchIn = r.punchInTime ? moment(r.punchInTime).format("hh:mm A") : "--";
+      const punchOut = r.punchOutTime ? moment(r.punchOutTime).format("hh:mm A") : "--";
 
       let status = "Absent";
       if (r.punchInTime && r.punchOutTime) {
-        const mins =
-          (new Date(r.punchOutTime) - new Date(r.punchInTime)) / 60000;
+        const mins = (new Date(r.punchOutTime) - new Date(r.punchInTime)) / 60000;
         status = mins < 360 ? "Short" : "Present";
       }
 
-      doc.fontSize(10);
-      doc.text(moment(r.date).format("DD MMM YYYY"), col.date, y);
-      doc.text(
-        r.punchInTime ? moment(r.punchInTime).format("hh:mm A") : "--",
-        col.in,
-        y
-      );
-      doc.text(
-        r.punchOutTime ? moment(r.punchOutTime).format("hh:mm A") : "--",
-        col.out,
-        y
-      );
-      doc.text(r.duration || "--", col.hrs, y);
-      doc.text(status, col.status, y);
-
-      doc.y = y + ROW_HEIGHT;
+      sheet.addRow({
+        name: employeeMap[r.employeeId] || "-", // <- will now map correctly
+        id: r.employeeId,
+        date: moment(r.date).format("DD MMM YYYY"),
+        in: punchIn,
+        out: punchOut,
+        hrs: r.duration || "--",
+        status,
+      });
     }
 
+    // Empty attendance case
     if (attendances.length === 0) {
-      doc
-        .moveDown(3)
-        .fontSize(12)
-        .fillColor("gray")
-        .text("No attendance records found.", { align: "center" });
+      sheet.addRow([]);
+      const emptyRow = sheet.addRow(["No attendance records found."]);
+      emptyRow.getCell(1).font = { italic: true, color: { argb: "FF808080" } };
     }
 
-    /* ================= FOOTER ================= */
+    // Footer
+    sheet.addRow([]);
+    const footerRow = sheet.addRow(["Generated by SoftPeople HRM"]);
+    footerRow.getCell(1).alignment = { horizontal: "center" };
+    footerRow.font = { italic: true, color: { argb: "FF808080" } };
 
-    doc
-      .moveDown(2)
-      .fontSize(9)
-      .fillColor("gray")
-      .text("Generated by SoftPeople HRM", { align: "center", width: 520 });
+    // ================= SEND EXCEL =================
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=attendance_${moment(from).format("DDMMYY")}_${moment(to).format("DDMMYY")}.xlsx`
+    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
-    doc.end();
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "PDF export failed" });
+    res.status(500).json({ message: "Excel export failed" });
   }
 });
-
 
 
 module.exports = router;
