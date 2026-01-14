@@ -308,7 +308,7 @@ router.get("/export/excel/all-interns", async (req, res) => {
       return res.status(400).json({ message: "from & to dates required" });
     }
 
-    // Attendance.date is STRING → use string comparison
+    // Attendance.date is STRING → string comparison
     const fromDateStr = from.split("T")[0]; // YYYY-MM-DD
     const toDateStr = to.split("T")[0];
 
@@ -342,7 +342,7 @@ router.get("/export/excel/all-interns", async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Attendance Report");
 
-    // Header
+    // ===== HEADER =====
     sheet.mergeCells("A1:G1");
     sheet.getCell("A1").value = "All Interns Attendance Report";
     sheet.getCell("A1").alignment = { horizontal: "center" };
@@ -361,7 +361,7 @@ router.get("/export/excel/all-interns", async (req, res) => {
 
     sheet.addRow([]);
 
-    // Columns
+    // ===== COLUMNS =====
     sheet.columns = [
       { header: "Intern Name", key: "name", width: 25 },
       { header: "Intern ID", key: "internId", width: 15 },
@@ -372,25 +372,40 @@ router.get("/export/excel/all-interns", async (req, res) => {
       { header: "Status", key: "status", width: 12 },
     ];
 
-    // Freeze header & add filter
+    // 🔴 FORCE HEADER TITLES (fix for missing attributes)
+    sheet.getRow(4).values = [
+      "Intern Name",
+      "Intern ID",
+      "Date",
+      "Punch In",
+      "Punch Out",
+      "Hours",
+      "Status",
+    ];
+    sheet.getRow(4).font = { bold: true };
+
+    // Freeze header & filter
     sheet.views = [{ state: "frozen", ySplit: 4 }];
     sheet.autoFilter = { from: "A4", to: "G4" };
 
-    // Rows
+    // ===== ROWS =====
     records.forEach(r => {
       let punchIn = "--";
       let punchOut = "--";
       let duration = "--";
       let status = "Absent";
 
+      // Punch-in only → SHORT
       if (r.punchInTime) {
         punchIn = moment(r.punchInTime).format("hh:mm A");
+        status = "Short";
       }
 
       if (r.punchOutTime) {
         punchOut = moment(r.punchOutTime).format("hh:mm A");
       }
 
+      // Punch-in + Punch-out
       if (r.punchInTime && r.punchOutTime) {
         const mins =
           (new Date(r.punchOutTime) - new Date(r.punchInTime)) / 60000;
@@ -413,7 +428,7 @@ router.get("/export/excel/all-interns", async (req, res) => {
       });
     });
 
-    // Footer
+    // ===== FOOTER =====
     sheet.addRow([]);
     sheet.mergeCells(`A${sheet.rowCount}:G${sheet.rowCount}`);
     const footer = sheet.getRow(sheet.rowCount);
@@ -421,7 +436,7 @@ router.get("/export/excel/all-interns", async (req, res) => {
     footer.getCell(1).alignment = { horizontal: "center" };
     footer.getCell(1).font = { italic: true, color: { argb: "FF808080" } };
 
-    // Send file
+    // ===== SEND FILE =====
     res.setHeader(
       "Content-Disposition",
       `attachment; filename=All_Interns_Attendance_${moment(
@@ -440,6 +455,7 @@ router.get("/export/excel/all-interns", async (req, res) => {
     res.status(500).json({ message: "Excel export failed" });
   }
 });
+
 
 
 
