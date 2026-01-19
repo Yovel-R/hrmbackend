@@ -1,7 +1,7 @@
 const express = require("express");
 const Employee = require("../models/EmployeeModel");
 const EmployeeCounter = require("../models/EmployeeCounterModel");
-const LeaveCounter = require("../models/leaveCounter.model"); // <--- add this
+const LeaveCounter = require("../models/leaveCounter.model"); 
 const sendEmail = require("../utilities/sendEmail");
 const multer = require("multer");
 const ExcelJS = require("exceljs");

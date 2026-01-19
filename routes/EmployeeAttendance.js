@@ -357,5 +357,70 @@ router.get("/export/excel/all", async (req, res) => {
   }
 });
 
+router.get("/employee/today/all", async (req, res) => {
+  try {
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Kolkata",
+    });
+
+    const attendanceData = await Employee.aggregate([
+      {
+        $match: { status: { $ne: "inactive" } },
+      },
+      {
+        $lookup: {
+          from: "employeeattendances", // ✅ FIXED
+          let: { employeeId: "$EmployeeId" }, // ✅ FIXED
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$employeeId", "$$employeeId"] },
+                date: today,
+              },
+            },
+          ],
+          as: "attendance",
+        },
+      },
+      {
+        $unwind: {
+          path: "$attendance",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          employeeId: "$EmployeeId",
+          name: {
+            $concat: [
+              { $toUpper: { $substrCP: ["$fullName", 0, 1] } },
+              {
+                $substrCP: ["$fullName", 1, { $strLenCP: "$fullName" }],
+              },
+            ],
+          },
+          contact: 1,
+          punchInTime: "$attendance.punchInTime",
+          punchOutTime: "$attendance.punchOutTime",
+          duration: { $ifNull: ["$attendance.duration", "--"] },
+        },
+      },
+      {
+        $sort: { punchInTime: -1 }, // ✅ Present first
+      },
+    ]);
+
+    res.json({
+      date: today,
+      count: attendanceData.filter((a) => a.punchInTime).length,
+      attendance: attendanceData,
+    });
+  } catch (err) {
+    console.error("Error in /employee/today/all:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 
 module.exports = router;
