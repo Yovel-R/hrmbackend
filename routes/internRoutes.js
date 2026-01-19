@@ -1,11 +1,11 @@
 const express = require("express");
 const Intern = require("../models/Intern");
 const Resignation = require("../models/resignation.model.js");  
-const bcrypt = require("bcryptjs");
 const router = express.Router();
 const multer = require('multer');
 const upload = multer();
 const Counter = require("../models/counter.model");
+const ExcelJS = require("exceljs");
 
 
 router.post("/add", async (req, res) => {
@@ -38,7 +38,6 @@ router.post("/add", async (req, res) => {
       endDate,
       linkedin,
       internshipType,
-      // backend-generated field
       status: "initial",
     });
 
@@ -105,91 +104,9 @@ router.get("/all/active", async (req, res) => {
 
 
 
-// router.put("/accept/:id", async (req, res) => {
-//   try {
-//     const intern = await Intern.findById(req.params.id);
-//     if (!intern) return res.status(404).json({ message: "Intern not found" });
 
-//     const newId = await generateInternId();
-
-//     intern.internid = newId;
-//     intern.status = "approved";
-
-//     await intern.save();
-
-//     res.json({ message: "Intern approved", intern });
-//   } catch (err) {
-//     console.error("Approve Error:", err);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// });
 const sendEmail = require("../utilities/sendEmail");
 
-// router.put("/accept/:id", upload.fields([{ name: 'pdf' }, { name: 'pdf_1' }, { name: 'pdf_2' }]), async (req, res) => {
-//   try {
-//   const { onboardingDate, endDate, internshipType } = req.body;
-//   const intern = await Intern.findById(req.params.id);
-//   if (!intern) return res.status(404).json({ message: "Intern not found" });
-
-
-//   if (internshipType && !["Stipend", "Paid"].includes(internshipType)) {
-//   return res.status(400).json({ message: "Invalid internship type" });
-// }
-
-
-//   // Correct multer file access
-//   const pdfBuffer = req.files['pdf']?.[0]?.buffer;
-//   const pdf1Buffer = req.files['pdf_1']?.[0]?.buffer;
-//   const pdf2Buffer = req.files['pdf_2']?.[0]?.buffer;
-
-//   if (!pdfBuffer || !pdf1Buffer) {
-//     return res.status(400).json({ message: "PDF files missing" });
-//   }
-
-//   const newId = await generateInternId();
-//   intern.internid = newId;
-//   intern.status = "approved";
-
-//   const formatDate = (dateString) => {
-//     if (!dateString) return "";
-//     const date = new Date(dateString);
-//     return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
-//   };
-
-//   intern.onboardingDate = formatDate(onboardingDate);
-//   intern.endDate = formatDate(endDate);
-//   if (internshipType) {
-//         intern.internshipType = internshipType;
-//       }
-
-//   await intern.save();
-
-//   // Fix email attachments - use buffers directly
-//   await sendEmail({
-//     to: intern.email,
-//     subject: "Your Intern ID is Ready",
-//     html: `
-//       <h2>Hi ${intern.fullName},</h2>
-//       <p>Your profile has been <b>approved</b> 🎉</p>
-//       <p>Your new <b>Intern ID</b> is: <b>${newId}</b></p>
-//       <p>Onboarding Date: <b>${intern.onboardingDate}</b></p>
-//       <p>End Date: <b>${intern.endDate}</b></p>
-//       <p>Please save this ID — you'll use it for login.</p>
-//       <br><p>Regards,<br>HR Team</p>
-//     `,
-//     attachments: [
-//       { filename: `${newId} -Softrate Internship Offer Letter.pdf`, content: pdfBuffer },
-//       { filename: `${newId} -Softrate Internship Annexure.pdf`, content: pdf1Buffer },
-//       { filename: `${newId} - Softrate Internship NDA.pdf`, content: pdf2Buffer }
-//     ]
-//   });
-
-//   res.json({ message: "Intern approved & email sent", intern });
-// } catch (err) {
-//   console.error("Approve Error:", err);
-//   res.status(500).json({ message: "Server error", error: err.message });
-// }
-// });
 router.put(
   "/accept/:id",
   upload.fields([
@@ -348,20 +265,16 @@ router.get("/get/:internid", async (req, res) => {
 
 // changing approved to ongoing
 
-// in intern.routes.js
 router.get("/pastout", async (req, res) => {
   try {
     const year = parseInt(req.query.year);
     const month = parseInt(req.query.month); // 0 = all
 
-    // 1️⃣ Fetch accepted resignations
     const resignations = await Resignation.find({ status: "accepted" });
 
-    // 2️⃣ Filter by lastWorkingDay
     const filtered = resignations.filter((r) => {
       if (!r.lastWorkingDay) return false;
 
-      // "16 Dec 2025"
       const date = new Date(r.lastWorkingDay);
       if (isNaN(date)) return false;
 
@@ -371,14 +284,12 @@ router.get("/pastout", async (req, res) => {
       return true;
     });
 
-    // 3️⃣ Get intern details
     const internIds = filtered.map((r) => r.internId);
 
     const interns = await Intern.find({
       internid: { $in: internIds },
     });
 
-    // 4️⃣ Merge resignation + intern data
     const result = filtered.map((r) => {
       const intern = interns.find((i) => i.internid === r.internId);
 
@@ -401,6 +312,75 @@ router.get("/pastout", async (req, res) => {
 });
 
 
+router.get("/export/excel", async (req, res) => {
+  try {
+    const { status = "all" } = req.query;
 
+    const query =
+      status === "all"
+        ? {}
+        : { status };
+
+    const interns = await Intern.find(query).sort({ createdAt: -1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Interns");
+
+    sheet.columns = [
+      { header: "Intern ID", key: "internid", width: 15 },
+      { header: "Full Name", key: "fullName", width: 25 },
+      { header: "Email", key: "email", width: 30 },
+      { header: "Contact", key: "contact", width: 15 },
+      { header: "College", key: "college", width: 25 },
+      { header: "Year", key: "year", width: 10 },
+      { header: "Department", key: "department", width: 20 },
+      { header: "Role", key: "role", width: 20 },
+      { header: "Internship Type", key: "internshipType", width: 18 },
+      { header: "Status", key: "status", width: 15 },
+      { header: "Onboarding Date", key: "onboardingDate", width: 18 },
+      { header: "End Date", key: "endDate", width: 18 },
+      { header: "Created At", key: "createdAt", width: 22 },
+    ];
+
+    interns.forEach((intern) => {
+      sheet.addRow({
+        internid: intern.internid || "",
+        fullName: intern.fullName,
+        email: intern.email,
+        contact: intern.contact,
+        college: intern.college,
+        year: intern.year,
+        department: intern.department,
+        role: intern.role,
+        internshipType: intern.internshipType || "",
+        status: intern.status,
+        onboardingDate: intern.onboardingDate || "",
+        endDate: intern.endDate || "",
+        createdAt: intern.createdAt
+          ? new Date(intern.createdAt).toLocaleDateString("en-GB")
+          : "",
+      });
+    });
+
+    // Header style
+    sheet.getRow(1).font = { bold: true };
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=Intern_Data.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("Intern Excel Export Error:", err);
+    res.status(500).json({ message: "Excel export failed" });
+  }
+});
 
 module.exports = router;

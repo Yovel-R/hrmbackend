@@ -1,14 +1,10 @@
-// const express = require("express");
-// const Employee = require("../models/EmployeeModel");
-// const sendEmail = require("../utilities/sendEmail");
-// const multer = require("multer");
-// const EmployeeCounter = require("../models/EmployeeCounterModel");
 const express = require("express");
 const Employee = require("../models/EmployeeModel");
 const EmployeeCounter = require("../models/EmployeeCounterModel");
 const LeaveCounter = require("../models/leaveCounter.model"); // <--- add this
 const sendEmail = require("../utilities/sendEmail");
 const multer = require("multer");
+const ExcelJS = require("exceljs");
 
 
 const router = express.Router();
@@ -253,6 +249,118 @@ async function generateEmployeeId() {
   return `${prefix}${String(counter.seq).padStart(2, "0")}`;
 }
 
+
+
+router.get("/export/excel/all-employees", async (req, res) => {
+  try {
+    const { status = "all" } = req.query;
+
+    const query =
+      status === "all"
+        ? {}
+        : { status };
+
+    const employees = await Employee.find(query).sort({ submittedAt: -1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Employees");
+
+    sheet.columns = [
+      { header: "Employee ID", key: "EmployeeId", width: 18 },
+      { header: "Full Name", key: "fullName", width: 25 },
+      { header: "Email", key: "email", width: 30 },
+      { header: "Phone", key: "phone", width: 18 },
+      { header: "Status", key: "status", width: 15 },
+      { header: "Role", key: "role", width: 20 },
+      { header: "Onboarding Date", key: "onboardingDate", width: 18 },
+      { header: "Date of Birth", key: "dob", width: 15 },
+      { header: "Gender", key: "gender", width: 12 },
+      { header: "Nationality", key: "nationality", width: 15 },
+      { header: "Marital Status", key: "maritalStatus", width: 15 },
+
+      // Education
+      { header: "Qualification", key: "qualification", width: 18 },
+      { header: "Specialization", key: "specialization", width: 20 },
+      { header: "College", key: "college", width: 25 },
+      { header: "Passing Year", key: "passingYear", width: 15 },
+
+      // CGPA
+      { header: "UG CGPA", key: "ugCgpa", width: 12 },
+      { header: "PG CGPA", key: "pgCgpa", width: 12 },
+
+      // Experience
+      { header: "Experienced", key: "isExperienced", width: 15 },
+      { header: "Experience Years", key: "experienceYears", width: 18 },
+      { header: "Previous Organization", key: "previousOrg", width: 25 },
+      { header: "Designation", key: "designation", width: 20 },
+
+      // Emergency
+      { header: "Emergency Contact Name", key: "emergencyName", width: 25 },
+      { header: "Emergency Contact Phone", key: "emergencyPhone", width: 20 },
+
+      { header: "Submitted At", key: "submittedAt", width: 22 },
+    ];
+
+    employees.forEach((emp) => {
+      sheet.addRow({
+        EmployeeId: emp.EmployeeId || "",
+        fullName: emp.fullName || "",
+        email: emp.email || "",
+        phone: emp.phone || "",
+        status: emp.status || "",
+        role: emp.role || "",
+        onboardingDate: emp.onboardingDate
+          ? new Date(emp.onboardingDate).toLocaleDateString("en-GB")
+          : "",
+        dob: emp.dob
+          ? new Date(emp.dob).toLocaleDateString("en-GB")
+          : "",
+        gender: emp.gender || "",
+        nationality: emp.nationality || "",
+        maritalStatus: emp.maritalStatus || "",
+
+        qualification: emp.qualification || "",
+        specialization: emp.specialization || "",
+        college: emp.college || "",
+        passingYear: emp.passingYear || "",
+
+        ugCgpa: emp.ugCgpa ?? "",
+        pgCgpa: emp.pgCgpa ?? "",
+
+        isExperienced: emp.isExperienced ? "Yes" : "No",
+        experienceYears: emp.experienceYears || "",
+        previousOrg: emp.previousOrg || "",
+        designation: emp.designation || "",
+
+        emergencyName: emp.emergencyName || "",
+        emergencyPhone: emp.emergencyPhone || "",
+
+        submittedAt: emp.submittedAt
+          ? new Date(emp.submittedAt).toLocaleDateString("en-GB")
+          : "",
+      });
+    });
+
+    // Header styling
+    sheet.getRow(1).font = { bold: true };
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=Employee_Data.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("Employee Excel Export Error:", err);
+    res.status(500).json({ message: "Employee Excel export failed" });
+  }
+});
 
 
 module.exports = router;
