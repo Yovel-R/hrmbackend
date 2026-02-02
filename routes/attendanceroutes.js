@@ -4,18 +4,56 @@ const Attendance = require("../models/attendancemodel");
 const PDFDocument = require("pdfkit");
 const moment = require("moment");
 const Intern = require("../models/Intern");
+const Holiday = require("../models/Holiday"); 
 const router = express.Router();
 
-
 // 📌 Punch In
+
 router.post("/punch-in", async (req, res) => {
   try {
     const { internId, location } = req.body;
 
-    const today = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999); // End of today
 
-    // Check if already punched in
-    let record = await Attendance.findOne({ internId, date: today });
+    const todayStr = today.toISOString().slice(0, 10); // yyyy-mm-dd
+
+    // ✅ 1. CHECK HOLIDAY FIRST
+    // Special holidays
+    const specialHoliday = await Holiday.findOne({
+      type: "special",
+      fromDate: { $lte: todayEnd },
+      toDate: { $gte: today }
+    });
+
+    if (specialHoliday) {
+      return res.status(400).json({ 
+        message: `Cannot punch in - Today is holiday: ${specialHoliday.reason}` 
+      });
+    }
+
+    // Weekly holidays
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon...
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = dayNames[dayOfWeek];
+    const weekNum = Math.ceil(today.getDate() / 7);
+
+    const weeklyHoliday = await Holiday.findOne({
+      type: "weekly",
+      day: dayName,
+      weeks: weekNum
+    });
+
+    if (weeklyHoliday) {
+      return res.status(400).json({ 
+        message: `Cannot punch in - ${dayName} ${weekNum}st week holiday` 
+      });
+    }
+
+    // ✅ 2. Continue with existing logic
+    let record = await Attendance.findOne({ internId, date: todayStr });
 
     if (record && record.punchInTime) {
       return res.status(400).json({ message: "Already punched in today." });
@@ -24,7 +62,7 @@ router.post("/punch-in", async (req, res) => {
     if (!record) {
       record = new Attendance({
         internId,
-        date: today,
+        date: todayStr,
       });
     }
 
@@ -39,6 +77,7 @@ router.post("/punch-in", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
+
 
 
 // 📌 Punch Out
@@ -133,21 +172,19 @@ router.get("/today/all", async (req, res) => {
         }
       },
       {
-        // Flatten attendance array
         $unwind: {
           path: "$attendance",
           preserveNullAndEmptyArrays: true // keep interns with no attendance
         }
       },
       {
-        // Project fields for frontend
         $project: {
           internId: "$internid",
           name: { $concat: [
             { $toUpper: { $substrCP: ["$fullName", 0, 1] } }, // capitalize first letter
             { $substrCP: ["$fullName", 1, { $strLenCP: "$fullName" }] }
           ]},
-          contact: 1, // 🔹 include contact number
+          contact: 1, 
           punchInTime: "$attendance.punchInTime",
           punchOutTime: "$attendance.punchOutTime",
           duration: { $ifNull: ["$attendance.duration", "--"] }

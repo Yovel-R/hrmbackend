@@ -4,6 +4,7 @@ const PDFDocument = require("pdfkit");
 const moment = require("moment");
 const Employee = require("../models/EmployeeModel");
 const ExcelJS = require("exceljs");
+const Holiday = require("../models/Holiday"); // ✅ Add at TOP of file
 
 
 const router = express.Router();
@@ -11,13 +12,50 @@ const router = express.Router();
 /* ======================
    📌 Punch In
 ====================== */
+
 router.post("/punch-in", async (req, res) => {
   try {
     const { employeeId, location } = req.body;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999); // End of today
+    const todayStr = today.toISOString().slice(0, 10);
 
-    let record = await Attendance.findOne({ employeeId, date: today });
+    // ✅ 1. HOLIDAY CHECK - SPECIAL HOLIDAYS
+    const specialHoliday = await Holiday.findOne({
+      type: "special",
+      fromDate: { $lte: todayEnd },
+      toDate: { $gte: today }
+    });
+
+    if (specialHoliday) {
+      return res.status(400).json({ 
+        message: `Cannot punch in - Today is holiday: ${specialHoliday.reason}` 
+      });
+    }
+
+    // ✅ 2. HOLIDAY CHECK - WEEKLY HOLIDAYS
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon...
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = dayNames[dayOfWeek];
+    const weekNum = Math.ceil(today.getDate() / 7);
+
+    const weeklyHoliday = await Holiday.findOne({
+      type: "weekly",
+      day: dayName,
+      weeks: weekNum
+    });
+
+    if (weeklyHoliday) {
+      return res.status(400).json({ 
+        message: `Cannot punch in - ${dayName} ${weekNum}st week holiday` 
+      });
+    }
+
+    // ✅ 3. EXISTING ATTENDANCE LOGIC
+    let record = await Attendance.findOne({ employeeId, date: todayStr });
 
     if (record && record.punchInTime) {
       return res.status(400).json({ message: "Already punched in today." });
@@ -26,13 +64,12 @@ router.post("/punch-in", async (req, res) => {
     if (!record) {
       record = new Attendance({
         employeeId,
-        date: today,
+        date: todayStr,
       });
     }
 
     record.punchInTime = new Date();
     record.punchInLocation = location;
-
     await record.save();
 
     res.json({ message: "Punch In successful", record });
@@ -43,15 +80,50 @@ router.post("/punch-in", async (req, res) => {
 });
 
 /* ======================
-   📌 Punch Out
+   📌 Punch Out - WITH HOLIDAY CHECK
 ====================== */
 router.post("/punch-out", async (req, res) => {
   try {
     const { employeeId, location } = req.body;
 
-    const today = new Date().toISOString().slice(0, 10);
+    // ✅ SAME HOLIDAY CHECK as punch-in
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayStr = today.toISOString().slice(0, 10);
 
-    let record = await Attendance.findOne({ employeeId, date: today });
+    const specialHoliday = await Holiday.findOne({
+      type: "special",
+      fromDate: { $lte: todayEnd },
+      toDate: { $gte: today }
+    });
+
+    if (specialHoliday) {
+      return res.status(400).json({ 
+        message: `Cannot punch out - Today is holiday: ${specialHoliday.reason}` 
+      });
+    }
+
+    const dayOfWeek = today.getDay();
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = dayNames[dayOfWeek];
+    const weekNum = Math.ceil(today.getDate() / 7);
+
+    const weeklyHoliday = await Holiday.findOne({
+      type: "weekly",
+      day: dayName,
+      weeks: weekNum
+    });
+
+    if (weeklyHoliday) {
+      return res.status(400).json({ 
+        message: `Cannot punch out - ${dayName} ${weekNum}st week holiday` 
+      });
+    }
+
+    // ✅ EXISTING PUNCH OUT LOGIC
+    let record = await Attendance.findOne({ employeeId, date: todayStr });
 
     if (!record || !record.punchInTime) {
       return res.status(400).json({ message: "Punch-in not found for today" });
@@ -67,13 +139,9 @@ router.post("/punch-out", async (req, res) => {
     const diffMs = record.punchOutTime - record.punchInTime;
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    record.duration = `${hours.toString().padStart(2, "0")}:${minutes
-      .toString()
-      .padStart(2, "0")}`;
+    record.duration = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 
     await record.save();
-
     res.json({ message: "Punch Out successful", record });
   } catch (err) {
     console.log(err);
@@ -369,8 +437,8 @@ router.get("/employee/today/all", async (req, res) => {
       },
       {
         $lookup: {
-          from: "employeeattendances", // ✅ FIXED
-          let: { employeeId: "$EmployeeId" }, // ✅ FIXED
+          from: "employeeattendances", 
+          let: { employeeId: "$EmployeeId" }, 
           pipeline: [
             {
               $match: {
@@ -399,7 +467,7 @@ router.get("/employee/today/all", async (req, res) => {
               },
             ],
           },
-          contact: 1,
+          phone: 1,
           punchInTime: "$attendance.punchInTime",
           punchOutTime: "$attendance.punchOutTime",
           duration: { $ifNull: ["$attendance.duration", "--"] },
