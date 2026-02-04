@@ -7,52 +7,49 @@ router.post("/", async (req, res) => {
   try {
     const { type, day, weeks, fromDate, toDate, reason } = req.body;
 
-    if (type === "weekly" && day && weeks) {
-      const created = [];
+    if (type === "weekly" && day) {
+      const newWeeks = Array.isArray(weeks) ? weeks : [];
 
-      // ✅ Single document per day (all weeks)
-      const existingHoliday = await Holiday.findOne({
-        type: "weekly",
-        day
-      });
-
-      const allWeeks = Array.isArray(weeks) ? weeks : [weeks];
-      
-      if (existingHoliday) {
-        // Merge weeks (avoid duplicates)
-        const newWeeks = [...new Set([...existingHoliday.weeks, ...allWeeks])];
-        existingHoliday.weeks = newWeeks;
-        await existingHoliday.save();
-        created.push(existingHoliday);
-      } else {
-        const holiday = new Holiday({
-          type,
-          day,
-          weeks: allWeeks,
-        });
-        await holiday.save();
-        created.push(holiday);
+      // CASE 1: DELETE ALL (empty weeks)
+      if (newWeeks.length === 0) {
+        const deleted = await Holiday.findOneAndDelete({ type: "weekly", day });
+        if (deleted) {
+          return res.status(200).json({ 
+            message: `All weekly holidays for ${day} deleted`,
+            deleted: true 
+          });
+        } else {
+          return res.status(404).json({ message: `No holiday found for ${day}` });
+        }
       }
 
+      // CASE 2: REPLACE with new weeks selection
+      // Delete existing holiday for this day
+      await Holiday.findOneAndDelete({ type: "weekly", day });
+      
+      // Create NEW holiday with ONLY selected weeks
+      const holiday = new Holiday({
+        type: "weekly",
+        day,
+        weeks: newWeeks  // ONLY selected weeks [1,5]
+      });
+      
+      await holiday.save();
+      
       return res.status(201).json({ 
         message: "Weekly holidays updated", 
-        created 
+        holiday 
       });
     }
 
+    // Special holiday logic (unchanged)
     if (type === "special" && fromDate && toDate && reason) {
       const from = new Date(fromDate);
       const to = new Date(toDate);
-
-      // 🚫 BLOCK ANY OVERLAP - No multiple submissions on same date
+      
       const overlappingHoliday = await Holiday.findOne({
         type: "special",
-        $or: [
-          { 
-            fromDate: { $lte: to }, 
-            toDate: { $gte: from } 
-          }
-        ]
+        $or: [{ fromDate: { $lte: to }, toDate: { $gte: from } }]
       });
 
       if (overlappingHoliday) {
@@ -61,18 +58,10 @@ router.post("/", async (req, res) => {
         });
       }
 
-      const holiday = new Holiday({ 
-        type, 
-        fromDate: from, 
-        toDate: to, 
-        reason 
-      });
+      const holiday = new Holiday({ type, fromDate: from, toDate: to, reason });
       await holiday.save();
       
-      return res.status(201).json({ 
-        message: "Special holiday added", 
-        holiday 
-      });
+      return res.status(201).json({ message: "Special holiday added", holiday });
     }
 
     res.status(400).json({ message: "Invalid data" });
@@ -80,6 +69,10 @@ router.post("/", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+
+
+
 
 // 📅 Get all holidays
 router.get("/", async (req, res) => {
