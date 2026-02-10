@@ -151,8 +151,7 @@ router.get("/today/all", async (req, res) => {
     // Aggregation: join interns with today's attendance
     const attendanceData = await Intern.aggregate([
       {
-        // Exclude interns with state 'initial' or 'drop'
-        $match: { state: { $nin: ["initial", "drop"] } }
+        $match: { status: { $nin: ["initial", "drop"] } }
       },
       {
         // Lookup today's attendance
