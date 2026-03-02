@@ -31,6 +31,9 @@ router.post("/submit-review", async (req, res) => {
     }
 
     const today = new Date();
+    if (today.getDate() <= 5) {
+      today.setMonth(today.getMonth() - 1);
+    }
     const dateStr = today.toISOString().split("T")[0];
     const monthStr = dateStr.slice(0, 7);
 
@@ -86,6 +89,9 @@ router.get("/self/:employeeId", async (req, res) => {
     const { employeeId } = req.params;
 
     const now = new Date();
+    if (now.getDate() <= 5) {
+      now.setMonth(now.getMonth() - 1);
+    }
     const monthStr = `${now.getFullYear()}-${String(
       now.getMonth() + 1
     ).padStart(2, "0")}`;
