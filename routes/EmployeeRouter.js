@@ -253,14 +253,27 @@ async function generateEmployeeId() {
 
 router.get("/export/excel/all-employees", async (req, res) => {
   try {
-    const { status = "all" } = req.query;
+    const { status = "all", from, to } = req.query;
 
     const query =
       status === "all"
         ? {}
         : { status };
 
-    const employees = await Employee.find(query).sort({ submittedAt: -1 });
+    let employees = await Employee.find(query).sort({ submittedAt: -1 });
+
+    if (from && to) {
+      const fromDate = new Date(from);
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+
+      employees = employees.filter((emp) => {
+        if (!emp.onboardingDate) return false;
+        const onboardDate = new Date(emp.onboardingDate);
+        if (isNaN(onboardDate)) return false;
+        return onboardDate >= fromDate && onboardDate <= toDate;
+      });
+    }
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Employees");
