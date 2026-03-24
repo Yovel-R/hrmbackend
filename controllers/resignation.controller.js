@@ -1,19 +1,6 @@
 const Resignation = require("../models/resignation.model");
 const Intern = require("../models/Intern");
-const nodemailer = require("nodemailer");
-
-// Utility to send email
-async function sendEmail(to, subject, text, attachments = []) {
-  const transporter = nodemailer.createTransport({
-    service: "Gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  await transporter.sendMail({ from: process.env.EMAIL_USER, to, subject, text, attachments });
-}
+const sendEmail = require("../utilities/sendEmail");
 
 // CREATE resignation
 exports.createResignation = async (req, res) => {
@@ -111,12 +98,12 @@ exports.updateResignationStatus = async (req, res) => {
       intern.status = "drop";
       await intern.save();
 
-      await sendEmail(
-        intern.email,
-        "Your Resignation has been Accepted",
-        `Hello ${intern.fullName},\n\nYour resignation has been accepted.\n\nBest Regards,\nHR Team`,
+      await sendEmail({
+        to: intern.email,
+        subject: "Your Resignation has been Accepted",
+        text: `Hello ${intern.fullName},\n\nYour resignation has been accepted.\n\nBest Regards,\nHR Team`,
         attachments
-      );
+      });
 
       return res.json({ message: "Resignation accepted and email sent" });
 
@@ -124,11 +111,11 @@ exports.updateResignationStatus = async (req, res) => {
       resignation.status = "rejected";
       await resignation.save();
 
-      await sendEmail(
-        intern.email,
-        "Your Resignation has been Rejected",
-        `Hello ${intern.fullName},\n\nYour resignation request has been rejected.\n\nBest Regards,\nHR Team`
-      );
+      await sendEmail({
+        to: intern.email,
+        subject: "Your Resignation has been Rejected",
+        text: `Hello ${intern.fullName},\n\nYour resignation request has been rejected.\n\nBest Regards,\nHR Team`
+      });
 
       return res.json({ message: "Resignation rejected and email sent" });
 
