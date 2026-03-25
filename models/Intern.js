@@ -24,6 +24,7 @@ const InternSchema = new mongoose.Schema({
 
   // New backend auto-field
   status: { type: String, default: "initial" },
+  leaveCount: { type: Number, default: 0 },
 
   createdAt: { type: Date, default: Date.now },
 });

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Leave = require("../models/leave.model");
+const Intern = require("../models/Intern");
 
 router.post("/apply", async (req, res) => {
   try {
@@ -12,6 +13,37 @@ router.post("/apply", async (req, res) => {
 
     const fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
     const toDay   = new Date(toDate.getFullYear(),   toDate.getMonth(),   toDate.getDate());
+
+    const numberOfDays = Number(data.numberOfDays);
+
+    // 1. Intern Leave Limit Logic
+    const intern = await Intern.findOne({ internid: internId });
+    if (intern) {
+      const yy = (fromDay.getFullYear() % 100).toString().padStart(2, "0");
+      const mm = (fromDay.getMonth() + 1).toString().padStart(2, "0");
+      const currentMonthPrefix = parseInt(`${yy}${mm}`); // e.g., 2603
+
+      let currentLeaveCount = intern.leaveCount || 0;
+      let monthPrefix = Math.floor(currentLeaveCount / 10);
+      let countInMonth = currentLeaveCount % 10;
+
+      if (monthPrefix !== currentMonthPrefix) {
+        // New month or first time, reset count
+        monthPrefix = currentMonthPrefix;
+        countInMonth = 0;
+      }
+
+      if (countInMonth + numberOfDays > 2) {
+        return res.status(400).json({
+          success: false,
+          message: `Interns are allowed only 2 leaves per month. You currently have ${countInMonth} leaves and are requesting ${numberOfDays} more.`,
+        });
+      }
+
+      // Update intern's leave count (will be saved if leave is saved)
+      intern.leaveCount = (monthPrefix * 10) + (countInMonth + numberOfDays);
+      await intern.save();
+    }
 
     console.log("APPLY request:", {
       internId,
@@ -28,16 +60,10 @@ router.post("/apply", async (req, res) => {
       toDate:   { $gte: fromDay },
     });
 
-    console.log("Overlapping leaves found:", overlapping.length);
-    overlapping.forEach(l => {
-      console.log(" -", l._id, l.status, l.fromDate, l.toDate);
-    });
-
     if (overlapping.length > 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "You already have a leave request that overlaps these dates.",
+        message: "You already have a leave request that overlaps these dates.",
       });
     }
 
@@ -47,7 +73,7 @@ router.post("/apply", async (req, res) => {
       leaveType: data.leaveType,
       fromDate: fromDay,
       toDate: toDay,
-      numberOfDays: Number(data.numberOfDays),
+      numberOfDays: numberOfDays,
       reason: data.reason,
       status: "pending",
       rejectionReason: "",
@@ -61,6 +87,7 @@ router.post("/apply", async (req, res) => {
       message: "Leave applied successfully",
       leaveId: leave._id,
     });
+
   } catch (err) {
     console.error("Leave apply error:", err);
     res.status(500).json({ success: false, error: err.message });
