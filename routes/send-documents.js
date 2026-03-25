@@ -24,7 +24,13 @@ router.post(
       await sendEmail({
         to: process.env.RECIVER_EMAIL_USER,
         subject: `Intern Documents - ${internName} (${internId})`,
-        text: `Hi Admin,\n\nPlease find attached all internship documents for ${internName}.\n\nThanks.`,
+        text: `
+          <p>Hi Admin,</p>
+          <p>Please find attached all internship documents for the following intern:</p>
+          <p><b>Intern Name :</b> ${internName}</p>
+          <p><b>Intern ID :</b> ${internId}</p>
+          <p>Thanks.</p>
+        `,
         attachments,
       });
 
