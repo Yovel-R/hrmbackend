@@ -150,17 +150,19 @@ router.put(
         subject: "Internship Application – Approval Notification",
         html: `
           <p>Dear ${intern.fullName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')},</p>
-          <p>This is to officially inform you that your application has been reviewed and your profile has been approved for the internship program.</p>
+          <p>This is to inform you that your application has been reviewed and your profile has been approved for the internship program.</p>
           <p>Your internship details are as follows:</p>
           <ul>
-            <li><b>Intern ID:</b> ${newId}</li>
-            <li><b>Onboarding Date:</b> ${new Date(onboardingDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</li>
-            <li><b>End Date:</b> ${new Date(endDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</li>
+            <li>Intern ID: ${newId}</li>
+            <li>Onboarding Date: ${new Date(onboardingDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</li>
+            <li>End Date: ${new Date(endDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</li>
           </ul>
-          <p>Kindly make note of your Intern ID for all future correspondence with our organization. Further details regarding the onboarding process, reporting structure, and other formalities will be communicated to you shortly.</p>
-          <p>We request you to confirm receipt of this email at your earliest convenience.</p>
+          <p>To proceed further, please log in to the HRMS portal using the credentials shared separately.</p>
+          <p>For first-time login, you will be required to set your own password and complete your profile by providing the necessary details.</p>
+          <p>Kindly ensure that all required information is submitted before your onboarding date to avoid any delays.</p>
+          <p>For any queries, feel free to contact us.</p>
           <br>
-          <p>Yours sincerely,<br><b>HR Team</b><br>Human Resources Department<br>Softrate Technologies Pvt Ltd</p>
+          <p>Regards,<br>HR Team<br>Softrate Global</p>
         `,
         attachments: [
           { filename: `${newId}-Offer-Letter.pdf`, content: pdfBuffer },
