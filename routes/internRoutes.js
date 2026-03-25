@@ -192,7 +192,6 @@ router.delete("/reject/:id", async (req, res) => {
 
 
 
-
 // id generator
 
 async function generateInternId() {
@@ -264,6 +263,30 @@ router.get("/get/:internid", async (req, res) => {
 });
 
 // changing approved to ongoing
+router.post("/update-status", async (req, res) => {
+  try {
+    const { internId, status } = req.body;
+
+    const intern = await Intern.findOneAndUpdate(
+      { internid: internId },
+      { status: status },
+      { new: true }
+    );
+
+    if (!intern) {
+      return res.status(404).json({ message: "Intern not found" });
+    }
+
+    res.status(200).json({
+      message: "Status updated successfully",
+      intern,
+    });
+  } catch (err) {
+    console.error("Update Status Error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
 
 router.get("/pastout", async (req, res) => {
   try {
