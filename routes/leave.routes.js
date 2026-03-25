@@ -36,7 +36,7 @@ router.post("/apply", async (req, res) => {
       if (countInMonth + numberOfDays > 2) {
         return res.status(400).json({
           success: false,
-          message: `Interns are allowed only 2 leaves per month. You currently have ${countInMonth} leaves and are requesting ${numberOfDays} more.`,
+          message: `Interns are allowed only 2 leaves per month.`,
         });
       }
 
