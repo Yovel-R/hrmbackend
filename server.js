@@ -8,6 +8,7 @@ require("./cron/leaveReset.cron");
 const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
+app.use(express.static('public'));
 
 // ============================
 // MongoDB Atlas Connection
@@ -22,6 +23,7 @@ mongoose.connect(process.env.MONGO_URI)
 // ============================
 app.use('/api/hr', require('./routes/HrRouters'));
 app.use('/api/intern', require('./routes/internRoutes'));
+app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/attendance', require('./routes/attendanceroutes'));
 app.use('/api/reviews', require('./routes/internReview.route'));
 app.use('/api/leave', require('./routes/leave.routes'));
