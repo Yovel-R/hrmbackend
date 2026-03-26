@@ -88,7 +88,7 @@ exports.updateResignationStatus = async (req, res) => {
 
     let attachments = [];
     if (req.files?.length) {
-      req.files.forEach(f => attachments.push({ path: f.path, filename: f.originalname }));
+      req.files.forEach(f => attachments.push({ content: f.buffer, filename: f.originalname }));
     }
 
     if (action === "accept") {
