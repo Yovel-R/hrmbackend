@@ -496,4 +496,45 @@ router.get("/export/excel/all-interns", async (req, res) => {
 
 
 
+// 📌 Manual Update Attendance (HR only)
+router.post("/update-manual", async (req, res) => {
+  try {
+    const { internId, date, punchInTime, punchOutTime } = req.body;
+
+    if (!internId || !date) {
+      return res.status(400).json({ message: "internId and date are required" });
+    }
+
+    let record = await Attendance.findOne({ internId, date });
+    if (!record) {
+      record = new Attendance({ internId, date });
+    }
+
+    if (punchInTime !== undefined) {
+      record.punchInTime = punchInTime ? new Date(punchInTime) : null;
+    }
+    if (punchOutTime !== undefined) {
+      record.punchOutTime = punchOutTime ? new Date(punchOutTime) : null;
+    }
+
+    // Recalculate duration if both exist
+    if (record.punchInTime && record.punchOutTime) {
+      const diffMs = record.punchOutTime - record.punchInTime;
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      record.duration = `${hours.toString().padStart(2, "0")}:${minutes
+        .toString()
+        .padStart(2, "0")}`;
+    } else {
+      record.duration = null;
+    }
+
+    await record.save();
+    return res.json({ message: "Attendance updated successfully", record });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
