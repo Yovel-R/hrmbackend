@@ -10,7 +10,7 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
     const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev"; 
     
     const emailConfig = {
-      from: `"People Soft" <${fromEmail}>`,
+      from: `"PeopleSoft" <${fromEmail}>`,
       to,
       subject,
       replyTo: process.env.RECIVER_EMAIL_USER,
