@@ -69,7 +69,7 @@ ${resetLink}
 
 If you did not request a password reset, you can safely ignore this email.
 
-Best regards,
+Regards,
 HR Team
 Softrate Global`
     });
