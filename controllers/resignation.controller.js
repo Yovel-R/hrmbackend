@@ -98,10 +98,41 @@ exports.updateResignationStatus = async (req, res) => {
       intern.status = "drop";
       await intern.save();
 
+      const lastDate = resignation.lastWorkingDay 
+        ? new Date(resignation.lastWorkingDay).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) 
+        : "(TBD)";
+      
+      let certificateLine = "";
+      if (attachments.length > 0) {
+        const fileNames = attachments.map(a => a.filename).join(", ");
+        certificateLine = `Please find the following documents attached for your records: ${fileNames}.`;
+      } else {
+        certificateLine = "Your internship completion certificate and experience letter will be issued within 7 working days after the successful completion of all formalities.";
+      }
+
       await sendEmail({
         to: intern.email,
-        subject: "Your Resignation has been Accepted",
-        text: `Hello ${intern.fullName},\n\nYour resignation has been accepted.\n\nBest Regards,\nHR Team`,
+        subject: "Internship Offboarding Confirmed – Softrate Global",
+        text: `Dear ${intern.fullName},
+
+Thank you for submitting your offboarding form. We are pleased to confirm that your internship offboarding process has been successfully initiated and accepted by the HR team.
+
+Your internship with Softrate Global officially concludes on ${lastDate}. It has been a pleasure having you as part of our team, and we appreciate the effort and enthusiasm you have brought during your tenure.
+
+As part of the offboarding process, please ensure the following are completed before your last day:
+
+1. Return all company-issued assets (ID card, access badge, equipment, etc.)
+2. Complete knowledge transfer and handover of pending tasks to your reporting manager
+3. Ensure all project documentation is up to date and shared with the team
+4. Clear any outstanding approvals or submissions
+
+${certificateLine}
+
+We truly wish you the very best in your academic and professional journey ahead. Stay in touch!
+
+Warm regards,
+Human Resources
+Softrate Global`,
         attachments
       });
 
