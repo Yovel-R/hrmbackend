@@ -17,7 +17,14 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
     };
 
     if (html) emailConfig.html = html;
-    if (text) emailConfig.text = text;
+    
+    // Ensure we have a plain text version for better deliverability
+    if (text) {
+      emailConfig.text = text;
+    } else if (html) {
+      // Basic HTML to Text fallback (remove tags)
+      emailConfig.text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
     
     if (attachments.length > 0) {
       emailConfig.attachments = attachments;
