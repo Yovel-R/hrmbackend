@@ -137,8 +137,8 @@ ${certificateLine}
 
 We truly wish you the very best in your academic and professional journey ahead. Stay in touch!
 
-Warm regards,
-Human Resources
+Regards,
+HR Team
 Softrate Global`,
         attachments
       });
@@ -151,8 +151,23 @@ Softrate Global`,
 
       await sendEmail({
         to: intern.email,
-        subject: "Your Resignation has been Rejected",
-        text: `Hello ${intern.fullName},\n\nYour resignation request has been rejected.\n\nBest Regards,\nHR Team`
+        subject: "Internship Offboarding Form Rejected – Softrate Global",
+        text: `Dear ${intern.fullName},
+
+Thank you for submitting your internship offboarding form. After careful review, we regret to inform you that your form has been rejected as the following formalities are still pending:
+
+1. Return of all company-issued assets (ID card, access badge, equipment, etc.) is not completed.
+2. Knowledge transfer and handover of pending tasks to your reporting manager is not completed.
+3. Project documentation is not up to date or has not been shared with the team.
+4. Outstanding approvals or submissions have not been cleared.
+
+Kindly complete the above formalities and resubmit your offboarding form at the earliest.
+
+For further details or assistance, please contact your HR at hr@softrateglobal.com or visit the HR desk during working hours.
+
+Regards,
+HR Team
+Softrate Global`
       });
 
       return res.json({ message: "Resignation rejected and email sent" });
