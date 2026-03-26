@@ -16,33 +16,35 @@ router.post("/apply", async (req, res) => {
 
     const numberOfDays = Number(data.numberOfDays);
 
-    // 1. Intern Leave Limit Logic
+    // 1. Intern Leave Limit Logic (Enforce 2 days per month)
     const intern = await Intern.findOne({ internid: internId });
     if (intern) {
-      const yy = (fromDay.getFullYear() % 100).toString().padStart(2, "0");
-      const mm = (fromDay.getMonth() + 1).toString().padStart(2, "0");
-      const currentMonthPrefix = parseInt(`${yy}${mm}`); // e.g., 2603
+      const year = fromDay.getFullYear();
+      const month = fromDay.getMonth(); // 0-indexed
 
-      let currentLeaveCount = intern.leaveCount || 0;
-      let monthPrefix = Math.floor(currentLeaveCount / 10);
-      let countInMonth = currentLeaveCount % 10;
+      // Start and end of the target month
+      const startOfMonth = new Date(year, month, 1);
+      const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999);
 
-      if (monthPrefix !== currentMonthPrefix) {
-        // New month or first time, reset count
-        monthPrefix = currentMonthPrefix;
-        countInMonth = 0;
-      }
+      // Query all non-rejected leaves for this intern in the same month
+      const existingLeaves = await Leave.find({
+        internId,
+        status: { $ne: "rejected" },
+        fromDate: { $gte: startOfMonth, $lte: endOfMonth }
+      });
 
-      if (countInMonth + numberOfDays > 2) {
+      const usedDays = existingLeaves.reduce((sum, l) => sum + (l.numberOfDays || 0), 0);
+
+      if (usedDays + numberOfDays > 2) {
         return res.status(400).json({
           success: false,
-          message: `Interns are allowed only 2 leaves per month.`,
+          message: `Interns are allowed only 2 leaves per month. You have already used/applied for ${usedDays} day(s) this month.`,
         });
       }
 
-      // Update intern's leave count (will be saved if leave is saved)
-      intern.leaveCount = (monthPrefix * 10) + (countInMonth + numberOfDays);
-      await intern.save();
+      // Note: We no longer need to update intern.leaveCount as we query the Leave collection directly.
+      // However, for backward compatibility or UI display, we could still update it, 
+      // but it's cleaner to let the calculation be dynamic.
     }
 
     console.log("APPLY request:", {
@@ -176,6 +178,41 @@ router.get("/pastout", async (req, res) => {
     res
       .status(500)
       .json({ message: "Server error", error: err.message });
+  }
+});
+
+// GET /api/leave/count/:internId?month=3&year=2026
+router.get("/count/:internId", async (req, res) => {
+  try {
+    const { internId } = req.params;
+    const month = parseInt(req.query.month); // 1-12
+    const year = parseInt(req.query.year);
+
+    if (isNaN(month) || isNaN(year)) {
+      return res.status(400).json({ success: false, message: "Month and Year are required." });
+    }
+
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const leaves = await Leave.find({
+      internId,
+      status: { $ne: "rejected" },
+      fromDate: { $gte: startOfMonth, $lte: endOfMonth }
+    });
+
+    const totalDays = leaves.reduce((sum, l) => sum + (l.numberOfDays || 0), 0);
+
+    res.status(200).json({
+      success: true,
+      internId,
+      month,
+      year,
+      totalDays,
+      limit: 2
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
