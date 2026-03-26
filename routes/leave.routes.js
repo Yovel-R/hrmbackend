@@ -125,6 +125,41 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+// GET /api/leave/count/:internId?month=3&year=2026
+router.get("/count/:internId", async (req, res) => {
+  try {
+    const { internId } = req.params;
+    const month = parseInt(req.query.month); // 1-12
+    const year = parseInt(req.query.year);
+
+    if (isNaN(month) || isNaN(year)) {
+      return res.status(400).json({ success: false, message: "Month and Year are required." });
+    }
+
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const leaves = await Leave.find({
+      internId,
+      status: { $ne: "rejected" },
+      fromDate: { $gte: startOfMonth, $lte: endOfMonth }
+    });
+
+    const totalDays = leaves.reduce((sum, l) => sum + (l.numberOfDays || 0), 0);
+
+    res.status(200).json({
+      success: true,
+      internId,
+      month,
+      year,
+      totalDays,
+      limit: 2
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/leave/:internId
 router.get("/:internId", async (req, res) => {
   try {
@@ -181,39 +216,5 @@ router.get("/pastout", async (req, res) => {
   }
 });
 
-// GET /api/leave/count/:internId?month=3&year=2026
-router.get("/count/:internId", async (req, res) => {
-  try {
-    const { internId } = req.params;
-    const month = parseInt(req.query.month); // 1-12
-    const year = parseInt(req.query.year);
-
-    if (isNaN(month) || isNaN(year)) {
-      return res.status(400).json({ success: false, message: "Month and Year are required." });
-    }
-
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
-
-    const leaves = await Leave.find({
-      internId,
-      status: { $ne: "rejected" },
-      fromDate: { $gte: startOfMonth, $lte: endOfMonth }
-    });
-
-    const totalDays = leaves.reduce((sum, l) => sum + (l.numberOfDays || 0), 0);
-
-    res.status(200).json({
-      success: true,
-      internId,
-      month,
-      year,
-      totalDays,
-      limit: 2
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 module.exports = router;
