@@ -163,7 +163,7 @@ Thank you for submitting your internship offboarding form. After careful review,
 
 Kindly complete the above formalities and resubmit your offboarding form at the earliest.
 
-For further details or assistance, please contact your HR at hr@softrateglobal.com or visit the HR desk during working hours.
+For further details or assistance, please contact your HR at hr@softrateglobal.com.
 
 Regards,
 HR Team
