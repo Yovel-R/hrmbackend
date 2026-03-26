@@ -13,6 +13,7 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
       from: `"People Soft" <${fromEmail}>`,
       to,
       subject,
+      replyTo: process.env.RECIVER_EMAIL_USER,
     };
 
     if (html) emailConfig.html = html;
