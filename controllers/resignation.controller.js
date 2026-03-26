@@ -98,14 +98,21 @@ exports.updateResignationStatus = async (req, res) => {
       intern.status = "drop";
       await intern.save();
 
-      const lastDate = resignation.lastWorkingDay 
-        ? new Date(resignation.lastWorkingDay).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) 
+      const lastDate = intern.endDate 
+        ? new Date(intern.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) 
         : "(TBD)";
       
       let certificateLine = "";
       if (attachments.length > 0) {
-        const fileNames = attachments.map(a => a.filename).join(", ");
-        certificateLine = `Please find the following documents attached for your records: ${fileNames}.`;
+        const nameMap = {
+          "Internship_Certificate.pdf": "Internship Completion Certificate",
+          "Project_Certificate.pdf": "Project Completion Certificate",
+          "LOR.pdf": "Letter of Recommendation"
+        };
+        const professionalNames = attachments
+          .map(a => nameMap[a.filename] || a.filename)
+          .join(", ");
+        certificateLine = `Please find your following documents attached for your records: ${professionalNames}.`;
       } else {
         certificateLine = "Your internship completion certificate and experience letter will be issued within 7 working days after the successful completion of all formalities.";
       }
