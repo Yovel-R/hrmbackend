@@ -154,7 +154,7 @@ Softrate Global`,
         subject: "Internship Offboarding Form Rejected – Softrate Global",
         text: `Dear ${intern.fullName},
 
-Thank you for submitting your internship offboarding form. After careful review, we regret to inform you that your form has been rejected as the following formalities are still pending:
+Thank you for submitting your internship offboarding form. After careful review, we regret to inform you that your form has been rejected. This could be due to pending formalities such as:
 
 1. Return of all company-issued assets (ID card, access badge, equipment, etc.) is not completed.
 2. Knowledge transfer and handover of pending tasks to your reporting manager is not completed.
