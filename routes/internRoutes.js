@@ -148,7 +148,7 @@ router.put(
       await intern.save();
 
       console.log("Intern saved successfully. Preparing to send email...");
-      console.log("logoDataUri present?", !!logoDataUri);
+      console.log("LOGO_CID:", LOGO_CID);
       console.log("Attachments presence - Offer:", !!pdfBuffer, "Annexure:", !!pdf1Buffer, "NDA:", !!pdf2Buffer);
 
       await sendEmail({
