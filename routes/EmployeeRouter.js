@@ -3,6 +3,7 @@ const Employee = require("../models/EmployeeModel");
 const EmployeeCounter = require("../models/EmployeeCounterModel");
 const LeaveCounter = require("../models/leaveCounter.model"); 
 const sendEmail = require("../utilities/sendEmail");
+const { getSignature } = require("../utilities/emailSignature");
 const multer = require("multer");
 const ExcelJS = require("exceljs");
 
@@ -156,11 +157,13 @@ router.put("/accept/:id", async (req, res) => {
     await sendEmail({
       to: employee.email,
       subject: "Your Employee ID is Ready",
-      html: `<h2>Hi ${employee.fullName},</h2>
-             <p>Your profile has been <b>approved</b> 🎉</p>
-             <p><b>Employee ID:</b> ${newEmployeeId}</p>
-             <p><b>Onboarding Date:</b> ${onboardingDate}</p>
-             <br><p>Regards,<br>HR Team</p>`,
+      html: `<div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+               <h2>Hi ${employee.fullName},</h2>
+               <p>Your profile has been <b>approved</b> 🎉</p>
+               <p><b>Employee ID:</b> ${newEmployeeId}</p>
+               <p><b>Onboarding Date:</b> ${onboardingDate}</p>
+               ${getSignature()}
+             </div>`,
     });
 
     res.json({ message: "Employee approved & email sent", employee });

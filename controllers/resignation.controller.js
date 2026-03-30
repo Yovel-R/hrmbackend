@@ -1,6 +1,8 @@
 const Resignation = require("../models/resignation.model");
 const Intern = require("../models/Intern");
 const sendEmail = require("../utilities/sendEmail");
+const { getSignature } = require("../utilities/emailSignature");
+
 
 // CREATE resignation
 exports.createResignation = async (req, res) => {
@@ -86,6 +88,11 @@ exports.updateResignationStatus = async (req, res) => {
     const intern = await Intern.findOne({ internid: resignation.internId });
     if (!intern) return res.status(404).json({ message: "Intern not found" });
 
+    const formattedName = intern.fullName
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+
     let attachments = [];
     if (req.files?.length) {
       req.files.forEach(f => attachments.push({ content: f.buffer, filename: f.originalname }));
@@ -119,27 +126,24 @@ exports.updateResignationStatus = async (req, res) => {
 
       await sendEmail({
         to: intern.email,
-        subject: "Internship Offboarding Confirmed – Softrate Global",
-        text: `Dear ${intern.fullName},
-
-Thank you for submitting your offboarding form. We are pleased to confirm that your internship offboarding process has been successfully initiated and accepted by the HR team.
-
-Your internship with Softrate Global officially concludes on ${lastDate}. It has been a pleasure having you as part of our team, and we appreciate the effort and enthusiasm you have brought during your tenure.
-
-As part of the offboarding process, please ensure the following are completed before your last day:
-
-1. Return all company-issued assets (ID card, access badge, equipment, etc.)
-2. Complete knowledge transfer and handover of pending tasks to your reporting manager
-3. Ensure all project documentation is up to date and shared with the team
-4. Clear any outstanding approvals or submissions
-
-${certificateLine}
-
-We truly wish you the very best in your academic and professional journey ahead. Stay in touch!
-
-Regards,
-HR Team
-Softrate Global`,
+        subject: "Internship Offboarding Confirmed - PeopleSoft",
+        html: `
+          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <p>Dear ${formattedName},</p>
+            <p>Thank you for submitting your offboarding form. We are pleased to confirm that your internship offboarding process has been successfully initiated and accepted by the HR team.</p>
+            <p>Your internship with Softrate Global officially concludes on <b>${lastDate}</b>. It has been a pleasure having you as part of our team, and we appreciate the effort and enthusiasm you have brought during your tenure.</p>
+            <p>As part of the offboarding process, please ensure the following are completed before your last day:</p>
+            <ul style="padding-left: 20px;">
+              <li>1. Return all company-issued assets (ID card, access badge, equipment, etc.)</li>
+              <li>2. Complete knowledge transfer and handover of pending tasks to your reporting manager</li>
+              <li>3. Ensure all project documentation is up to date and shared with the team</li>
+              <li>4. Clear any outstanding approvals or submissions</li>
+            </ul>
+            <p>${certificateLine}</p>
+            <p>We truly wish you the very best in your academic and professional journey ahead. Stay in touch!</p>
+            ${getSignature()}
+          </div>
+        `,
         attachments
       });
 
@@ -151,23 +155,22 @@ Softrate Global`,
 
       await sendEmail({
         to: intern.email,
-        subject: "Internship Offboarding Form Rejected – Softrate Global",
-        text: `Dear ${intern.fullName},
-
-Thank you for submitting your internship offboarding form. After careful review, we regret to inform you that your form has been rejected. This could be due to pending formalities such as:
-
-1. Return of all company-issued assets (ID card, access badge, equipment, etc.) is not completed.
-2. Knowledge transfer and handover of pending tasks to your reporting manager is not completed.
-3. Project documentation is not up to date or has not been shared with the team.
-4. Outstanding approvals or submissions have not been cleared.
-
-Kindly complete the above formalities and resubmit your offboarding form at the earliest.
-
-For further details or assistance, please contact your HR at hr@softrateglobal.com.
-
-Regards,
-HR Team
-Softrate Global`
+        subject: "Internship Offboarding Form Rejected - PeopleSoft",
+        html: `
+          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <p>Dear ${formattedName},</p>
+            <p>Thank you for submitting your internship offboarding form. After careful review, we regret to inform you that your form has been rejected. This could be due to pending formalities such as:</p>
+            <ol style="padding-left: 20px;">
+              <li>1. Return of all company-issued assets (ID card, access badge, equipment, etc.) is not completed.</li>
+              <li>2. Knowledge transfer and handover of pending tasks to your reporting manager is not completed.</li>
+              <li>3. Project documentation is not up to date or has not been shared with the team.</li>
+              <li>4. Outstanding approvals or submissions have not been cleared.</li>
+            </ol>
+            <p>Kindly complete the above formalities and resubmit your offboarding form at the earliest.</p>
+            <p>For further details or assistance, please contact your HR at <a href="mailto:hr@softrateglobal.com">hr@softrateglobal.com</a>.</p>
+            ${getSignature()}
+          </div>
+        `
       });
 
       return res.json({ message: "Resignation rejected and email sent" });

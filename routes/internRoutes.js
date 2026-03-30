@@ -106,6 +106,8 @@ router.get("/all/active", async (req, res) => {
 
 
 const sendEmail = require("../utilities/sendEmail");
+const { getSignature } = require("../utilities/emailSignature");
+
 
 router.put(
   "/accept/:id",
@@ -161,8 +163,7 @@ router.put(
           <p>For first-time login, you will be required to set your own password and complete your profile by providing the necessary details.</p>
           <p>Kindly ensure that all required information is submitted before your onboarding date to avoid any delays.</p>
           <p>For any queries, feel free to contact us.</p>
-          <br>
-          <p>Regards,<br>HR Team<br>Softrate Global</p>
+          ${getSignature()}
         `,
         attachments: [
           { filename: `${newId}-Offer-Letter.pdf`, content: pdfBuffer },

@@ -3,6 +3,7 @@ const Employee = require("../models/EmployeeModel");
 const HrUser = require("../models/hr_models");
 const PasswordReset = require("../models/PasswordReset");
 const sendEmail = require("../utilities/sendEmail");
+const { getSignature } = require("../utilities/emailSignature");
 const crypto = require("crypto");
 
 exports.forgotPassword = async (req, res) => {
@@ -34,7 +35,10 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    name = user.fullName || user.name;
+    name = (user.fullName || user.name || '')
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
 
     // Generate token valid for 5 mins
     const token = crypto.randomBytes(32).toString('hex');
@@ -59,19 +63,18 @@ exports.forgotPassword = async (req, res) => {
     await sendEmail({
       to: email,
       subject: "Password Reset Request – Softrate Global",
-      text: `Dear ${name},
-
-We received a request to reset your password for your Softrate Global account.
-
-Please click the link below to set a new password. This link is valid for 5 minutes only:
-
-${resetLink}
-
-If you did not request a password reset, you can safely ignore this email.
-
-Regards,
-HR Team
-Softrate Global`
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+          <p>Dear ${name},</p>
+          <p>We received a request to reset your password for your Softrate Global account.</p>
+          <p>Please click the link below to set a new password. This link is valid for 5 minutes only:</p>
+          <p><a href="${resetLink}" style="display: inline-block; padding: 10px 20px; background-color: #0089d1; color: #fff; text-decoration: none; border-radius: 5px;">Reset Password</a></p>
+          <p>Or copy and paste this link into your browser:</p>
+          <p>${resetLink}</p>
+          <p>If you did not request a password reset, you can safely ignore this email.</p>
+          ${getSignature()}
+        </div>
+      `
     });
 
     res.status(200).json({ 
