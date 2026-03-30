@@ -16,20 +16,6 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
       replyTo: process.env.RECIVER_EMAIL_USER,
     };
 
-    // Auto-attach logo if referenced as cid:company-logo
-    const fs = require('fs');
-    const path = require('path');
-    if (html && html.includes('cid:company-logo')) {
-      const logoPath = path.join(__dirname, 'assets/images/Softrate Logo.jpg');
-      if (fs.existsSync(logoPath)) {
-        attachments.push({
-          filename: 'logo.jpg',
-          content: fs.readFileSync(logoPath),
-          cid: 'company-logo'
-        });
-      }
-    }
-
     if (html) emailConfig.html = html;
     
     // Ensure we have a plain text version for better deliverability
