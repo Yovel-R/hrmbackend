@@ -3,10 +3,19 @@ const fs = require("fs");
 const path = require("path");
 const { getSignature } = require("./emailSignature");
 
-// Generate once at module load (not on every email send)
+// Load logo once at module start
 const logoPath = path.join(__dirname, 'assets/images/Softrate Logo.jpg');
-const logoBase64 = fs.readFileSync(logoPath).toString('base64');
-const logoDataUri = `data:image/jpeg;base64,${logoBase64}`;
+const logoBuffer = fs.readFileSync(logoPath);
+const LOGO_CID = 'softrate_logo';
+
+// Inline attachment object — reused on every email
+const logoInlineAttachment = {
+  filename: 'softrate-logo.jpg',
+  content: logoBuffer,
+  content_type: 'image/jpeg',
+  content_id: LOGO_CID,
+  disposition: 'inline',
+};
 
 const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
   try {
@@ -28,9 +37,8 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
       emailConfig.text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
-    if (attachments.length > 0) {
-      emailConfig.attachments = attachments;
-    }
+    // Always include the logo as an inline attachment so cid:softrate_logo resolves
+    emailConfig.attachments = [logoInlineAttachment, ...attachments];
 
     const { data, error } = await resend.emails.send(emailConfig);
 
@@ -46,4 +54,4 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
   }
 };
 
-module.exports = { sendEmail, logoDataUri };
+module.exports = { sendEmail, LOGO_CID };

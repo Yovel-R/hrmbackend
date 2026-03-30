@@ -1,6 +1,6 @@
 const Resignation = require("../models/resignation.model");
 const Intern = require("../models/Intern");
-const { sendEmail, logoDataUri } = require("../utilities/sendEmail");
+const { sendEmail, LOGO_CID } = require("../utilities/sendEmail");
 const { getSignature } = require("../utilities/emailSignature");
 
 
@@ -140,7 +140,7 @@ exports.updateResignationStatus = async (req, res) => {
               <li style="margin-bottom: 4px;">4. Clear any outstanding approvals or submissions</li>
             </ul>
             <p style="margin: 0 0 15px 0;">${certificateLine}</p>
-            ${getSignature(logoDataUri)}
+            ${getSignature(LOGO_CID)}
           </div>
         `,
         attachments
@@ -167,7 +167,7 @@ exports.updateResignationStatus = async (req, res) => {
             </ol>
             <p style="margin: 0 0 10px 0;">Kindly complete the above formalities and resubmit your offboarding form at the earliest.</p>
             <p style="margin: 0 0 15px 0;">For further details or assistance, please contact your HR at <a href="mailto:hr@softrateglobal.com" style="color: #007bb6;">hr@softrateglobal.com</a>.</p>
-            ${getSignature(logoDataUri)}
+            ${getSignature(LOGO_CID)}
           </div>
         `
       });

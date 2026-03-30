@@ -105,7 +105,7 @@ router.get("/all/active", async (req, res) => {
 
 
 
-const { sendEmail, logoDataUri } = require("../utilities/sendEmail");
+const { sendEmail, LOGO_CID } = require("../utilities/sendEmail");
 const { getSignature } = require("../utilities/emailSignature");
 
 
@@ -167,7 +167,7 @@ router.put(
           <p style="margin: 0 0 0 0;">For first-time login, you will be required to set your own password and complete your profile by providing the necessary details.</p>
           <p style="margin: 0 0 0 0;">Kindly ensure that all required information is submitted before your onboarding date to avoid any delays.</p>
           <p style="margin: 0 0 15px 0;">For any queries, feel free to contact us.</p>
-          ${getSignature(logoDataUri)}
+          ${getSignature(LOGO_CID)}
         `,
         attachments: [
           { filename: `${newId}-Offer-Letter.pdf`, content: pdfBuffer },
