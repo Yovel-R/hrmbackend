@@ -1,8 +1,7 @@
 const { Resend } = require("resend");
-const path = require("path");
 
-// Publicly served via express.static('public') → https://hrmbackend-ndzp.onrender.com/assets/images/softrate-logo.jpg
-const LOGO_URL = 'https://hrmbackend-ndzp.onrender.com/assets/images/softrate-logo.jpg';
+// Logo hosted as a static asset — served via express.static('public')
+const LOGO_URL = `${process.env.BACKEND_URL}/assets/images/softrate-logo.jpg`;
 
 const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
   try {
