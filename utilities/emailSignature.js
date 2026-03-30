@@ -1,11 +1,5 @@
-// logoCid is optional — pass it for email-client-safe inline image; omit for plain text fallback
-const getSignature = (logoCid = null) => {
+const getSignature = (logoUrl = '') => {
   try {
-    // Use cid: reference if a content-id was provided, else fall back to hosted image
-    const logoSrc = logoCid
-      ? `cid:${logoCid}`
-      : 'https://www.softrateglobal.com/softrate-logo.jpg';
-
     return `
       <div style="margin-top: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
         <p style="margin: 0;">Do follow us on <a href="https://www.instagram.com/softrate" style="color: #007bb6; text-decoration: underline;">Instagram</a> and <a href="https://linkedin.com/company/softrate" style="color: #007bb6; text-decoration: underline;">LinkedIn</a> to stay updated on future opportunities!</p>
@@ -13,7 +7,7 @@ const getSignature = (logoCid = null) => {
         <p style="margin: 0;">Cheers,</p>
         <p style="margin: 0 0 15px 0; font-weight: 500;">Early Careers Team</p>
         <a href="https://www.softrateglobal.com/" style="text-decoration: none; display: inline-block; height: 46px; overflow: hidden;">
-          <img src="${logoSrc}" alt="Softrate Logo" width="145" style="display: block; border: 0; pointer-events: none; margin-top: -2px;">
+          <img src="${logoUrl}" alt="Softrate Logo" width="145" style="display: block; border: 0; pointer-events: none; margin-top: -2px;">
         </a>
       </div>
     `;

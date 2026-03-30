@@ -2,7 +2,7 @@ const Intern = require("../models/Intern");
 const Employee = require("../models/EmployeeModel");
 const HrUser = require("../models/hr_models");
 const PasswordReset = require("../models/PasswordReset");
-const { sendEmail, LOGO_CID } = require("../utilities/sendEmail");
+const { sendEmail, LOGO_URL } = require("../utilities/sendEmail");
 const { getSignature } = require("../utilities/emailSignature");
 const crypto = require("crypto");
 
@@ -72,7 +72,7 @@ exports.forgotPassword = async (req, res) => {
           <p>Or copy and paste this link into your browser:</p>
           <p>${resetLink}</p>
           <p>If you did not request a password reset, you can safely ignore this email.</p>
-          ${getSignature(LOGO_CID)}
+          ${getSignature(LOGO_URL)}
         </div>
       `
     });

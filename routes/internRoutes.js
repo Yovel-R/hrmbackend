@@ -105,7 +105,7 @@ router.get("/all/active", async (req, res) => {
 
 
 
-const { sendEmail, LOGO_CID } = require("../utilities/sendEmail");
+const { sendEmail, LOGO_URL } = require("../utilities/sendEmail");
 const { getSignature } = require("../utilities/emailSignature");
 
 
@@ -148,7 +148,7 @@ router.put(
       await intern.save();
 
       console.log("Intern saved successfully. Preparing to send email...");
-      console.log("LOGO_CID:", LOGO_CID);
+      console.log("LOGO_URL:", LOGO_URL);
       console.log("Attachments presence - Offer:", !!pdfBuffer, "Annexure:", !!pdf1Buffer, "NDA:", !!pdf2Buffer);
 
       await sendEmail({
@@ -167,7 +167,7 @@ router.put(
           <p style="margin: 0 0 0 0;">For first-time login, you will be required to set your own password and complete your profile by providing the necessary details.</p>
           <p style="margin: 0 0 0 0;">Kindly ensure that all required information is submitted before your onboarding date to avoid any delays.</p>
           <p style="margin: 0 0 15px 0;">For any queries, feel free to contact us.</p>
-          ${getSignature(LOGO_CID)}
+          ${getSignature(LOGO_URL)}
         `,
         attachments: [
           { filename: `${newId}-Offer-Letter.pdf`, content: pdfBuffer },
