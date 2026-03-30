@@ -2,7 +2,7 @@ const express = require("express");
 const Employee = require("../models/EmployeeModel");
 const EmployeeCounter = require("../models/EmployeeCounterModel");
 const LeaveCounter = require("../models/leaveCounter.model"); 
-const sendEmail = require("../utilities/sendEmail");
+const { sendEmail, logoDataUri } = require("../utilities/sendEmail");
 const { getSignature } = require("../utilities/emailSignature");
 const multer = require("multer");
 const ExcelJS = require("exceljs");
@@ -162,7 +162,7 @@ router.put("/accept/:id", async (req, res) => {
                <p>Your profile has been <b>approved</b> 🎉</p>
                <p><b>Employee ID:</b> ${newEmployeeId}</p>
                <p><b>Onboarding Date:</b> ${onboardingDate}</p>
-               ${getSignature()}
+               ${getSignature(logoDataUri)}
              </div>`,
     });
 

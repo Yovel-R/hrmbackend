@@ -1,6 +1,12 @@
 const { Resend } = require("resend");
 const fs = require("fs");
 const path = require("path");
+const { getSignature } = require("./emailSignature");
+
+// Generate once at module load (not on every email send)
+const logoPath = path.join(__dirname, 'assets/images/Softrate Logo.jpg');
+const logoBase64 = fs.readFileSync(logoPath).toString('base64');
+const logoDataUri = `data:image/jpeg;base64,${logoBase64}`;
 
 const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
   try {
@@ -22,20 +28,9 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
       emailConfig.text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
-    // Inline logo attachment for email signature
-    const logoPath = path.join(__dirname, 'assets/images/Softrate Logo.jpg');
-    const logoBase64 = fs.readFileSync(logoPath).toString('base64');
-
-    emailConfig.attachments = [
-      {
-        filename: 'Softrate Logo.jpg',
-        content: logoBase64,          // base64 string
-        content_type: 'image/jpeg',   // Resend uses content_type
-        inline: true,                 // makes it inline (cid usable)
-        content_id: 'company-logo',   // matches cid:company-logo in signature
-      },
-      ...attachments,                 // keep any other attachments passed in
-    ];
+    if (attachments.length > 0) {
+      emailConfig.attachments = attachments;
+    }
 
     const { data, error } = await resend.emails.send(emailConfig);
 
@@ -51,4 +46,4 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
   }
 };
 
-module.exports = sendEmail;
+module.exports = { sendEmail, logoDataUri };
