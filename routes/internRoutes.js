@@ -147,6 +147,10 @@ router.put(
 
       await intern.save();
 
+      console.log("Intern saved successfully. Preparing to send email...");
+      console.log("logoDataUri present?", !!logoDataUri);
+      console.log("Attachments presence - Offer:", !!pdfBuffer, "Annexure:", !!pdf1Buffer, "NDA:", !!pdf2Buffer);
+
       await sendEmail({
         to: intern.email,
         subject: "Internship Application – Approval Notification",
@@ -174,8 +178,9 @@ router.put(
 
       res.json({ message: "Intern approved & email sent", intern });
     } catch (err) {
+      console.error("Approve Error [FULL STACK]:", err.stack);
       console.error("Approve Error:", err);
-      res.status(500).json({ message: "Server error", error: err.message });
+      res.status(500).json({ message: "Server error", error: err.message, stack: err.stack });
     }
   }
 );
