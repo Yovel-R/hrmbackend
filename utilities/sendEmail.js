@@ -1,4 +1,18 @@
 const { Resend } = require("resend");
+const fs = require("fs");
+const path = require("path");
+
+let cachedLogoBuffer = null;
+
+const getLogoAttachment = () => {
+  if (!cachedLogoBuffer) {
+    const imgPath = path.join(__dirname, "assets/images/Softrate Logo.jpg");
+    if (fs.existsSync(imgPath)) {
+      cachedLogoBuffer = fs.readFileSync(imgPath);
+    }
+  }
+  return cachedLogoBuffer;
+};
 
 // In sendEmail.js - add attachments support
 const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
@@ -15,6 +29,18 @@ const sendEmail = async ({ to, subject, html, text, attachments = [] }) => {
       subject,
       replyTo: process.env.RECIVER_EMAIL_USER,
     };
+
+    // Auto-attach logo if referenced as cid:company-logo
+    if (html && html.includes('cid:company-logo')) {
+      const buffer = getLogoAttachment();
+      if (buffer) {
+        attachments.push({
+          filename: 'logo.jpg',
+          content: buffer,
+          cid: 'company-logo'
+        });
+      }
+    }
 
     if (html) emailConfig.html = html;
     

@@ -11,7 +11,7 @@ const getSignature = () => {
         <p style="margin: 0 0 15px 0; font-weight: 500;">Early Careers Team</p>
         
         <a href="https://www.softrateglobal.com/" style="text-decoration: none; display: inline-block; height: 46px; overflow: hidden;">
-          <img src="https://www.softrateglobal.com/assets/img/logo/softrate-logo.png" alt="Softrate Logo" width="145" style="display: block; border: 0; pointer-events: none; margin-top: -2px;">
+          <img src="cid:company-logo" alt="Softrate Logo" width="145" style="display: block; border: 0; pointer-events: none; margin-top: -2px;">
         </a>
       </div>
     `;
