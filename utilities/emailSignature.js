@@ -5,7 +5,7 @@ let cachedDataUri = null;
 
 const getLogoDataUri = () => {
   if (!cachedDataUri) {
-    const imgPath = path.join(__dirname, "../assets/images/Softrate Logo.jpg");
+    const imgPath = path.join(__dirname, "assets/images/Softrate Logo.jpg");
     if (fs.existsSync(imgPath)) {
       const base64 = fs.readFileSync(imgPath).toString("base64");
       cachedDataUri = `data:image/jpeg;base64,${base64}`;
