@@ -140,7 +140,6 @@ exports.updateResignationStatus = async (req, res) => {
               <li>4. Clear any outstanding approvals or submissions</li>
             </ul>
             <p>${certificateLine}</p>
-            <p>We truly wish you the very best in your academic and professional journey ahead. Stay in touch!</p>
             ${getSignature()}
           </div>
         `,
