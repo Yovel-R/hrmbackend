@@ -128,18 +128,18 @@ exports.updateResignationStatus = async (req, res) => {
         to: intern.email,
         subject: "Internship Offboarding Confirmed - PeopleSoft",
         html: `
-          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
-            <p>Dear ${formattedName},</p>
-            <p>Thank you for submitting your offboarding form. We are pleased to confirm that your internship offboarding process has been successfully initiated and accepted by the HR team.</p>
-            <p>Your internship with Softrate Global officially concludes on <b>${lastDate}</b>. It has been a pleasure having you as part of our team, and we appreciate the effort and enthusiasm you have brought during your tenure.</p>
-            <p>As part of the offboarding process, please ensure the following are completed before your last day:</p>
-            <ul style="padding-left: 20px;">
-              <li>1. Return all company-issued assets (ID card, access badge, equipment, etc.)</li>
-              <li>2. Complete knowledge transfer and handover of pending tasks to your reporting manager</li>
-              <li>3. Ensure all project documentation is up to date and shared with the team</li>
-              <li>4. Clear any outstanding approvals or submissions</li>
+          <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
+            <p style="margin: 0 0 10px 0;">Dear ${formattedName},</p>
+            <p style="margin: 0 0 10px 0;">Thank you for submitting your offboarding form. We are pleased to confirm that your internship offboarding process has been successfully initiated and accepted by the HR team.</p>
+            <p style="margin: 0 0 10px 0;">Your internship with Softrate Global officially concludes on <b>${lastDate}</b>. It has been a pleasure having you as part of our team, and we appreciate the effort and enthusiasm you have brought during your tenure.</p>
+            <p style="margin: 0 0 10px 0;">As part of the offboarding process, please ensure the following are completed before your last day:</p>
+            <ul style="padding-left: 20px; margin: 0 0 15px 0;">
+              <li style="margin-bottom: 4px;">1. Return all company-issued assets (ID card, access badge, equipment, etc.)</li>
+              <li style="margin-bottom: 4px;">2. Complete knowledge transfer and handover of pending tasks to your reporting manager</li>
+              <li style="margin-bottom: 4px;">3. Ensure all project documentation is up to date and shared with the team</li>
+              <li style="margin-bottom: 4px;">4. Clear any outstanding approvals or submissions</li>
             </ul>
-            <p>${certificateLine}</p>
+            <p style="margin: 0 0 15px 0;">${certificateLine}</p>
             ${getSignature()}
           </div>
         `,
@@ -156,17 +156,17 @@ exports.updateResignationStatus = async (req, res) => {
         to: intern.email,
         subject: "Internship Offboarding Form Rejected - PeopleSoft",
         html: `
-          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
-            <p>Dear ${formattedName},</p>
-            <p>Thank you for submitting your internship offboarding form. After careful review, we regret to inform you that your form has been rejected. This could be due to pending formalities such as:</p>
-            <ol style="padding-left: 20px;">
-              <li>1. Return of all company-issued assets (ID card, access badge, equipment, etc.) is not completed.</li>
-              <li>2. Knowledge transfer and handover of pending tasks to your reporting manager is not completed.</li>
-              <li>3. Project documentation is not up to date or has not been shared with the team.</li>
-              <li>4. Outstanding approvals or submissions have not been cleared.</li>
+          <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
+            <p style="margin: 0 0 10px 0;">Dear ${formattedName},</p>
+            <p style="margin: 0 0 10px 0;">Thank you for submitting your internship offboarding form. After careful review, we regret to inform you that your form has been rejected. This could be due to pending formalities such as:</p>
+            <ol style="padding-left: 20px; margin: 0 0 15px 0;">
+              <li style="margin-bottom: 4px;">Return of all company-issued assets (ID card, access badge, equipment, etc.) is not completed.</li>
+              <li style="margin-bottom: 4px;">Knowledge transfer and handover of pending tasks to your reporting manager is not completed.</li>
+              <li style="margin-bottom: 4px;">Project documentation is not up to date or has not been shared with the team.</li>
+              <li style="margin-bottom: 4px;">Outstanding approvals or submissions have not been cleared.</li>
             </ol>
-            <p>Kindly complete the above formalities and resubmit your offboarding form at the earliest.</p>
-            <p>For further details or assistance, please contact your HR at <a href="mailto:hr@softrateglobal.com">hr@softrateglobal.com</a>.</p>
+            <p style="margin: 0 0 10px 0;">Kindly complete the above formalities and resubmit your offboarding form at the earliest.</p>
+            <p style="margin: 0 0 15px 0;">For further details or assistance, please contact your HR at <a href="mailto:hr@softrateglobal.com" style="color: #007bb6;">hr@softrateglobal.com</a>.</p>
             ${getSignature()}
           </div>
         `

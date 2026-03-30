@@ -159,10 +159,10 @@ router.put(
             <li>Onboarding Date: ${new Date(onboardingDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</li>
             <li>End Date: ${new Date(endDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</li>
           </ul>
-          <p>To proceed further, please log in to the HRMS portal using the credentials shared separately.</p>
-          <p>For first-time login, you will be required to set your own password and complete your profile by providing the necessary details.</p>
-          <p>Kindly ensure that all required information is submitted before your onboarding date to avoid any delays.</p>
-          <p>For any queries, feel free to contact us.</p>
+          <p style="margin: 0 0 0 0;">To proceed further, please log in to the HRMS portal using the credentials shared separately.</p>
+          <p style="margin: 0 0 0 0;">For first-time login, you will be required to set your own password and complete your profile by providing the necessary details.</p>
+          <p style="margin: 0 0 0 0;">Kindly ensure that all required information is submitted before your onboarding date to avoid any delays.</p>
+          <p style="margin: 0 0 15px 0;">For any queries, feel free to contact us.</p>
           ${getSignature()}
         `,
         attachments: [
