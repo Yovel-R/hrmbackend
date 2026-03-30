@@ -8,9 +8,11 @@ const getSignature = () => {
         <p style="margin: 12px 0 24px 0;">Wishing you the best on your journey ahead!</p>
         
         <p style="margin: 0;">Cheers,</p>
-        <p style="margin: 0 0 24px 0; font-weight: 500;">Early Careers Team</p>
+        <p style="margin: 0 0 15px 0; font-weight: 500;">Early Careers Team</p>
         
-        <img src="https://www.softrateglobal.com/assets/img/logo/softrate-logo.png" alt="Softrate Logo" width="160" style="display: block; border: 0;">
+        <a href="https://www.softrateglobal.com/" style="text-decoration: none; display: inline-block; height: 46px; overflow: hidden;">
+          <img src="https://www.softrateglobal.com/assets/img/logo/softrate-logo.png" alt="Softrate Logo" width="145" style="display: block; border: 0; pointer-events: none; margin-top: -2px;">
+        </a>
       </div>
     `;
   } catch (error) {
